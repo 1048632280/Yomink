@@ -1,0 +1,14 @@
+# Xcode
+DerivedData/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+# Swift Package Manager
+.build/
+
+# CI artifacts
+build/
+Payload/
+*.ipa
+

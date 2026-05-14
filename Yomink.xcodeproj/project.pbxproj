@@ -1,0 +1,588 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		200000012000000120000001 /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000011000000110000001 /* AppCoordinator.swift */; };
+		200000022000000220000002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000021000000210000002 /* AppDelegate.swift */; };
+		200000032000000320000003 /* AppEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000031000000310000003 /* AppEnvironment.swift */; };
+		200000042000000420000004 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000041000000410000004 /* SceneDelegate.swift */; };
+		200000052000000520000005 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000051000000510000005 /* DatabaseManager.swift */; };
+		200000062000000620000006 /* DatabaseMigrator+Yomink.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000061000000610000006 /* DatabaseMigrator+Yomink.swift */; };
+		200000072000000720000007 /* BookRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000071000000710000007 /* BookRecord.swift */; };
+		200000082000000820000008 /* BookRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000081000000810000008 /* BookRepository.swift */; };
+		200000092000000920000009 /* ChapterParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000091000000910000009 /* ChapterParser.swift */; };
+		200000102000001020000010 /* TextDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000101000001010000010 /* TextDecoder.swift */; };
+		200000112000001120000011 /* TextEncoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000111000001110000011 /* TextEncoding.swift */; };
+		200000122000001220000012 /* BookFileMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000121000001210000012 /* BookFileMapping.swift */; };
+		200000132000001320000013 /* ReaderPageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000131000001310000013 /* ReaderPageCache.swift */; };
+		200000142000001420000014 /* CoreTextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000141000001410000014 /* CoreTextPaginator.swift */; };
+		200000152000001520000015 /* PageByteRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000151000001510000015 /* PageByteRange.swift */; };
+		200000162000001620000016 /* ReadingLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000161000001610000016 /* ReadingLayout.swift */; };
+		200000172000001720000017 /* ReadingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000171000001710000017 /* ReadingProgress.swift */; };
+		200000182000001820000018 /* ReadingProgressStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000181000001810000018 /* ReadingProgressStore.swift */; };
+		200000192000001920000019 /* TextWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000191000001910000019 /* TextWindow.swift */; };
+		200000202000002020000020 /* SearchIndexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000201000002010000020 /* SearchIndexService.swift */; };
+		200000212000002120000021 /* AppSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000211000002110000021 /* AppSettingsStore.swift */; };
+		200000222000002220000022 /* ReadingSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000221000002210000022 /* ReadingSettingsStore.swift */; };
+		200000232000002320000023 /* BookshelfViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000231000002310000023 /* BookshelfViewController.swift */; };
+		200000242000002420000024 /* BookshelfViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000241000002410000024 /* BookshelfViewModel.swift */; };
+		200000252000002520000025 /* ImportCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000251000002510000025 /* ImportCoordinator.swift */; };
+		200000262000002620000026 /* ReaderViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000261000002610000026 /* ReaderViewController.swift */; };
+		200000272000002720000027 /* PlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000271000002710000027 /* PlaceholderView.swift */; };
+		200000282000002820000028 /* YominkTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000281000002810000028 /* YominkTheme.swift */; };
+		200000292000002920000029 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000291000002910000029 /* Assets.xcassets */; };
+		200000302000003020000030 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 100000301000003010000030 /* LaunchScreen.storyboard */; };
+		200000312000003120000031 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 600000026000000260000002 /* GRDB */; };
+		200000322000003220000032 /* ReaderEngineModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000321000003210000032 /* ReaderEngineModelTests.swift */; };
+		200000332000003320000033 /* SettingsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000331000003310000033 /* SettingsModelTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		700000027000000270000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000010000000100000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000040000000400000004;
+			remoteInfo = Yomink;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		100000001000000010000000 /* Yomink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Yomink.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000341000003410000034 /* YominkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YominkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000011000000110000001 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppCoordinator.swift; sourceTree = "<group>"; };
+		100000021000000210000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
+		100000031000000310000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppEnvironment.swift; sourceTree = "<group>"; };
+		100000041000000410000004 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/SceneDelegate.swift; sourceTree = "<group>"; };
+		100000351000003510000035 /* Yomink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App/Yomink.entitlements; sourceTree = "<group>"; };
+		100000361000003610000036 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		100000051000000510000005 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/DatabaseManager.swift; sourceTree = "<group>"; };
+		100000061000000610000006 /* DatabaseMigrator+Yomink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/Migrations/DatabaseMigrator+Yomink.swift; sourceTree = "<group>"; };
+		100000071000000710000007 /* BookRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/Models/BookRecord.swift; sourceTree = "<group>"; };
+		100000081000000810000008 /* BookRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/Repositories/BookRepository.swift; sourceTree = "<group>"; };
+		100000091000000910000009 /* ChapterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/ChapterParsing/ChapterParser.swift; sourceTree = "<group>"; };
+		100000101000001010000010 /* TextDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Encoding/TextDecoder.swift; sourceTree = "<group>"; };
+		100000111000001110000011 /* TextEncoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Encoding/TextEncoding.swift; sourceTree = "<group>"; };
+		100000121000001210000012 /* BookFileMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/FileMapping/BookFileMapping.swift; sourceTree = "<group>"; };
+		100000131000001310000013 /* ReaderPageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/PageCache/ReaderPageCache.swift; sourceTree = "<group>"; };
+		100000141000001410000014 /* CoreTextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Pagination/CoreTextPaginator.swift; sourceTree = "<group>"; };
+		100000151000001510000015 /* PageByteRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Pagination/PageByteRange.swift; sourceTree = "<group>"; };
+		100000161000001610000016 /* ReadingLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Pagination/ReadingLayout.swift; sourceTree = "<group>"; };
+		100000171000001710000017 /* ReadingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/ProgressLocator/ReadingProgress.swift; sourceTree = "<group>"; };
+		100000181000001810000018 /* ReadingProgressStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/ProgressLocator/ReadingProgressStore.swift; sourceTree = "<group>"; };
+		100000191000001910000019 /* TextWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/TextWindow/TextWindow.swift; sourceTree = "<group>"; };
+		100000201000002010000020 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Search/SearchIndexService.swift; sourceTree = "<group>"; };
+		100000211000002110000021 /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Settings/AppSettingsStore.swift; sourceTree = "<group>"; };
+		100000221000002210000022 /* ReadingSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Settings/ReadingSettingsStore.swift; sourceTree = "<group>"; };
+		100000231000002310000023 /* BookshelfViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Bookshelf/BookshelfViewController.swift; sourceTree = "<group>"; };
+		100000241000002410000024 /* BookshelfViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Bookshelf/BookshelfViewModel.swift; sourceTree = "<group>"; };
+		100000251000002510000025 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Import/ImportCoordinator.swift; sourceTree = "<group>"; };
+		100000261000002610000026 /* ReaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Reader/ReaderViewController.swift; sourceTree = "<group>"; };
+		100000271000002710000027 /* PlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Components/PlaceholderView.swift; sourceTree = "<group>"; };
+		100000281000002810000028 /* YominkTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Themes/YominkTheme.swift; sourceTree = "<group>"; };
+		100000291000002910000029 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
+		100000301000003010000030 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = Resources/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		100000321000003210000032 /* ReaderEngineModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderEngineTests/ReaderEngineModelTests.swift; sourceTree = "<group>"; };
+		100000331000003310000033 /* SettingsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests/SettingsModelTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		400000014000000140000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				200000312000003120000031 /* GRDB in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		400000044000000440000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000020000000200000002 = {
+			isa = PBXGroup;
+			children = (
+				300000013000000130000001 /* Yomink */,
+				300000023000000230000002 /* YominkTests */,
+				000000030000000300000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		000000030000000300000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				100000001000000010000000 /* Yomink.app */,
+				100000341000003410000034 /* YominkTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		300000013000000130000001 /* Yomink */ = {
+			isa = PBXGroup;
+			children = (
+				100000361000003610000036 /* Info.plist */,
+				100000011000000110000001 /* AppCoordinator.swift */,
+				100000021000000210000002 /* AppDelegate.swift */,
+				100000031000000310000003 /* AppEnvironment.swift */,
+				100000041000000410000004 /* SceneDelegate.swift */,
+				100000351000003510000035 /* Yomink.entitlements */,
+				100000051000000510000005 /* DatabaseManager.swift */,
+				100000061000000610000006 /* DatabaseMigrator+Yomink.swift */,
+				100000071000000710000007 /* BookRecord.swift */,
+				100000081000000810000008 /* BookRepository.swift */,
+				100000091000000910000009 /* ChapterParser.swift */,
+				100000101000001010000010 /* TextDecoder.swift */,
+				100000111000001110000011 /* TextEncoding.swift */,
+				100000121000001210000012 /* BookFileMapping.swift */,
+				100000131000001310000013 /* ReaderPageCache.swift */,
+				100000141000001410000014 /* CoreTextPaginator.swift */,
+				100000151000001510000015 /* PageByteRange.swift */,
+				100000161000001610000016 /* ReadingLayout.swift */,
+				100000171000001710000017 /* ReadingProgress.swift */,
+				100000181000001810000018 /* ReadingProgressStore.swift */,
+				100000191000001910000019 /* TextWindow.swift */,
+				100000201000002010000020 /* SearchIndexService.swift */,
+				100000211000002110000021 /* AppSettingsStore.swift */,
+				100000221000002210000022 /* ReadingSettingsStore.swift */,
+				100000231000002310000023 /* BookshelfViewController.swift */,
+				100000241000002410000024 /* BookshelfViewModel.swift */,
+				100000251000002510000025 /* ImportCoordinator.swift */,
+				100000261000002610000026 /* ReaderViewController.swift */,
+				100000271000002710000027 /* PlaceholderView.swift */,
+				100000281000002810000028 /* YominkTheme.swift */,
+				100000291000002910000029 /* Assets.xcassets */,
+				100000301000003010000030 /* LaunchScreen.storyboard */,
+			);
+			path = Yomink;
+			sourceTree = "<group>";
+		};
+		300000023000000230000002 /* YominkTests */ = {
+			isa = PBXGroup;
+			children = (
+				100000321000003210000032 /* ReaderEngineModelTests.swift */,
+				100000331000003310000033 /* SettingsModelTests.swift */,
+			);
+			path = YominkTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000040000000400000004 /* Yomink */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 500000035000000350000003 /* Build configuration list for PBXNativeTarget "Yomink" */;
+			buildPhases = (
+				400000024000000240000002 /* Sources */,
+				400000014000000140000001 /* Frameworks */,
+				400000034000000340000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Yomink;
+			packageProductDependencies = (
+				600000026000000260000002 /* GRDB */,
+			);
+			productName = Yomink;
+			productReference = 100000001000000010000000 /* Yomink.app */;
+			productType = "com.apple.product-type.application";
+		};
+		000000050000000500000005 /* YominkTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 500000065000000650000006 /* Build configuration list for PBXNativeTarget "YominkTests" */;
+			buildPhases = (
+				400000054000000540000005 /* Sources */,
+				400000044000000440000004 /* Frameworks */,
+				400000064000000640000006 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				700000017000000170000001 /* PBXTargetDependency */,
+			);
+			name = YominkTests;
+			productName = YominkTests;
+			productReference = 100000341000003410000034 /* YominkTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000010000000100000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					000000040000000400000004 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					000000050000000500000005 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 000000040000000400000004;
+					};
+				};
+			};
+			buildConfigurationList = 500000005000000050000000 /* Build configuration list for PBXProject "Yomink" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000020000000200000002;
+			packageReferences = (
+				600000016000000160000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+			);
+			productRefGroup = 000000030000000300000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000040000000400000004 /* Yomink */,
+				000000050000000500000005 /* YominkTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		400000034000000340000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				200000292000002920000029 /* Assets.xcassets in Resources */,
+				200000302000003020000030 /* LaunchScreen.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		400000064000000640000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		400000024000000240000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				200000012000000120000001 /* AppCoordinator.swift in Sources */,
+				200000022000000220000002 /* AppDelegate.swift in Sources */,
+				200000032000000320000003 /* AppEnvironment.swift in Sources */,
+				200000042000000420000004 /* SceneDelegate.swift in Sources */,
+				200000052000000520000005 /* DatabaseManager.swift in Sources */,
+				200000062000000620000006 /* DatabaseMigrator+Yomink.swift in Sources */,
+				200000072000000720000007 /* BookRecord.swift in Sources */,
+				200000082000000820000008 /* BookRepository.swift in Sources */,
+				200000092000000920000009 /* ChapterParser.swift in Sources */,
+				200000102000001020000010 /* TextDecoder.swift in Sources */,
+				200000112000001120000011 /* TextEncoding.swift in Sources */,
+				200000122000001220000012 /* BookFileMapping.swift in Sources */,
+				200000132000001320000013 /* ReaderPageCache.swift in Sources */,
+				200000142000001420000014 /* CoreTextPaginator.swift in Sources */,
+				200000152000001520000015 /* PageByteRange.swift in Sources */,
+				200000162000001620000016 /* ReadingLayout.swift in Sources */,
+				200000172000001720000017 /* ReadingProgress.swift in Sources */,
+				200000182000001820000018 /* ReadingProgressStore.swift in Sources */,
+				200000192000001920000019 /* TextWindow.swift in Sources */,
+				200000202000002020000020 /* SearchIndexService.swift in Sources */,
+				200000212000002120000021 /* AppSettingsStore.swift in Sources */,
+				200000222000002220000022 /* ReadingSettingsStore.swift in Sources */,
+				200000232000002320000023 /* BookshelfViewController.swift in Sources */,
+				200000242000002420000024 /* BookshelfViewModel.swift in Sources */,
+				200000252000002520000025 /* ImportCoordinator.swift in Sources */,
+				200000262000002620000026 /* ReaderViewController.swift in Sources */,
+				200000272000002720000027 /* PlaceholderView.swift in Sources */,
+				200000282000002820000028 /* YominkTheme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		400000054000000540000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				200000322000003220000032 /* ReaderEngineModelTests.swift in Sources */,
+				200000332000003320000033 /* SettingsModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		700000017000000170000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000040000000400000004 /* Yomink */;
+			targetProxy = 700000027000000270000002 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		500000015000000150000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		500000025000000250000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		500000045000000450000004 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Yomink/App/Yomink.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Yomink/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yomink.reader;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		500000055000000550000005 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = Yomink/App/Yomink.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Yomink/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yomink.reader;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		500000075000000750000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yomink.reader.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Yomink.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Yomink";
+			};
+			name = Debug;
+		};
+		500000085000000850000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.yomink.reader.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Yomink.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Yomink";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		500000005000000050000000 /* Build configuration list for PBXProject "Yomink" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				500000015000000150000001 /* Debug */,
+				500000025000000250000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		500000035000000350000003 /* Build configuration list for PBXNativeTarget "Yomink" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				500000045000000450000004 /* Debug */,
+				500000055000000550000005 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		500000065000000650000006 /* Build configuration list for PBXNativeTarget "YominkTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				500000075000000750000007 /* Debug */,
+				500000085000000850000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		600000016000000160000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		600000026000000260000002 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 600000016000000160000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 000000010000000100000001 /* Project object */;
+}
