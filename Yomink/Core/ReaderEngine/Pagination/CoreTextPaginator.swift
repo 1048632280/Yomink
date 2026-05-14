@@ -35,6 +35,22 @@ struct CoreTextPaginator {
         bookID: UUID,
         encoding: TextEncoding
     ) throws -> PaginatedFirstPage {
+        try paginatePageWithText(
+            window: window,
+            layout: layout,
+            bookID: bookID,
+            pageIndex: 0,
+            encoding: encoding
+        )
+    }
+
+    func paginatePageWithText(
+        window: TextWindow,
+        layout: ReadingLayout,
+        bookID: UUID,
+        pageIndex: Int,
+        encoding: TextEncoding
+    ) throws -> PaginatedFirstPage {
         guard !Thread.isMainThread else {
             assertionFailure("CoreText pagination must not run on the main thread.")
             throw PaginationError.invalidLayout
@@ -73,7 +89,7 @@ struct CoreTextPaginator {
 
         let pageByteRange = PageByteRange(
             bookID: bookID,
-            pageIndex: 0,
+            pageIndex: pageIndex,
             byteRange: window.startByteOffset..<estimatedEndOffset
         )
         return PaginatedFirstPage(pageByteRange: pageByteRange, text: visibleText)

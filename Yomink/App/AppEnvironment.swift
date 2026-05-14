@@ -9,6 +9,7 @@ struct AppEnvironment {
     let searchIndexService: SearchIndexService
     let bookImportService: BookImportService
     let readerOpeningService: ReaderOpeningService
+    let readerPagingService: ReaderPagingService
 
     static func makeDefault() -> AppEnvironment {
         let databaseManager = DatabaseManager.defaultDatabase()
@@ -17,10 +18,15 @@ struct AppEnvironment {
         let readingSettingsStore = ReadingSettingsStore()
         let readingProgressStore = ReadingProgressStore(databaseManager: databaseManager)
         let searchIndexService = SearchIndexService(databaseManager: databaseManager)
+        let readerPageCache = ReaderPageCache()
         let bookImportService = BookImportService(bookRepository: bookRepository)
         let readerOpeningService = ReaderOpeningService(
             bookRepository: bookRepository,
             progressStore: readingProgressStore
+        )
+        let readerPagingService = ReaderPagingService(
+            bookRepository: bookRepository,
+            pageCache: readerPageCache
         )
 
         return AppEnvironment(
@@ -31,7 +37,8 @@ struct AppEnvironment {
             readingProgressStore: readingProgressStore,
             searchIndexService: searchIndexService,
             bookImportService: bookImportService,
-            readerOpeningService: readerOpeningService
+            readerOpeningService: readerOpeningService,
+            readerPagingService: readerPagingService
         )
     }
 }

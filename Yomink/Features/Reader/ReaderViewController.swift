@@ -7,24 +7,30 @@ final class ReaderViewController: UIViewController {
 
     private let book: BookRecord
     private let openingService: ReaderOpeningService
+    private let pagingService: ReaderPagingService
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, ReaderPage>?
+    private var pages: [ReaderPage] = []
     private var currentPage: ReaderPage?
     private var openingTask: Task<Void, Never>?
+    private var nextPageTask: Task<Void, Never>?
     private var didStartOpening = false
+    private var didReachEndOfBook = false
     private var activeLayout = ReadingSettings.standard.layout
 
     init(
         book: BookRecord,
         openingService: ReaderOpeningService,
+        pagingService: ReaderPagingService,
         readingSettingsStore: ReadingSettingsStore,
         progressStore: ReadingProgressStore
     ) {
         self.book = book
         self.openingService = openingService
+        self.pagingService = pagingService
         self.readingSettingsStore = readingSettingsStore
         self.progressStore = progressStore
 
@@ -68,6 +74,7 @@ final class ReaderViewController: UIViewController {
 
     deinit {
         openingTask?.cancel()
+        nextPageTask?.cancel()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -131,22 +138,71 @@ final class ReaderViewController: UIViewController {
 
             do {
                 let result = try await openingService.openFirstPage(request)
-                currentPage = result.page
-                applyPage(result.page)
+                applyInitialPage(result.page)
+                loadNextPageIfNeeded()
             } catch {
                 showOpeningError()
             }
         }
     }
 
-    private func applyPage(_ page: ReaderPage) {
+    private func applyInitialPage(_ page: ReaderPage) {
+        pages = [page]
+        currentPage = page
+        applyPagesSnapshot()
+    }
+
+    private func appendPage(_ page: ReaderPage) {
+        guard !pages.contains(where: { $0.startByteOffset == page.startByteOffset }) else {
+            return
+        }
+        pages.append(page)
+        applyPagesSnapshot()
+    }
+
+    private func applyPagesSnapshot() {
         var snapshot = NSDiffableDataSourceSnapshot<Section, ReaderPage>()
         snapshot.appendSections([.main])
-        snapshot.appendItems([page], toSection: .main)
+        snapshot.appendItems(pages, toSection: .main)
         dataSource?.apply(snapshot, animatingDifferences: false)
     }
 
+    private func loadNextPageIfNeeded() {
+        guard !didReachEndOfBook,
+              nextPageTask == nil,
+              let lastPage = pages.last,
+              lastPage.endByteOffset < book.fileSize else {
+            return
+        }
+
+        let request = ReaderPageRequest(
+            bookID: book.id,
+            startByteOffset: lastPage.endByteOffset,
+            pageIndex: lastPage.pageIndex + 1,
+            layout: activeLayout
+        )
+
+        nextPageTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let nextPage = try await pagingService.page(request)
+                nextPageTask = nil
+                guard let nextPage else {
+                    didReachEndOfBook = true
+                    return
+                }
+                appendPage(nextPage)
+            } catch {
+                nextPageTask = nil
+            }
+        }
+    }
+
     private func saveCurrentProgress() {
+        updateCurrentPageFromVisiblePage()
         guard let currentPage else {
             return
         }
@@ -165,6 +221,23 @@ final class ReaderViewController: UIViewController {
         saveCurrentProgress()
     }
 
+    private func updateCurrentPageFromVisiblePage() {
+        guard collectionView.bounds.width > 1 else {
+            return
+        }
+
+        let visibleCenter = CGPoint(
+            x: collectionView.contentOffset.x + collectionView.bounds.midX,
+            y: collectionView.bounds.midY
+        )
+        guard let indexPath = collectionView.indexPathForItem(at: visibleCenter),
+              pages.indices.contains(indexPath.item) else {
+            return
+        }
+
+        currentPage = pages[indexPath.item]
+    }
+
     private func showOpeningError() {
         let alert = UIAlertController(title: "打开失败", message: "无法打开这本 TXT。", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "好", style: .default))
@@ -173,6 +246,22 @@ final class ReaderViewController: UIViewController {
 }
 
 extension ReaderViewController: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        guard pages.indices.contains(indexPath.item) else {
+            return
+        }
+
+        currentPage = pages[indexPath.item]
+        if indexPath.item >= pages.count - 2 {
+            loadNextPageIfNeeded()
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        updateCurrentPageFromVisiblePage()
+        loadNextPageIfNeeded()
+    }
+
     func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,

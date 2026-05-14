@@ -49,6 +49,9 @@
 		200000402000004020000040 /* ReaderOpeningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000431000004310000043 /* ReaderOpeningServiceTests.swift */; };
 		200000412000004120000041 /* ReadingProgressStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000441000004410000044 /* ReadingProgressStoreTests.swift */; };
 		200000422000004220000042 /* BookImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000451000004510000045 /* BookImportServiceTests.swift */; };
+		200000432000004320000043 /* ReaderPageRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000461000004610000046 /* ReaderPageRequest.swift */; };
+		200000442000004420000044 /* ReaderPagingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000471000004710000047 /* ReaderPagingService.swift */; };
+		200000452000004520000045 /* ReaderPagingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000481000004810000048 /* ReaderPagingServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -107,6 +110,9 @@
 		100000431000004310000043 /* ReaderOpeningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ReaderOpeningServiceTests.swift"; sourceTree = "<group>"; };
 		100000441000004410000044 /* ReadingProgressStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/ReadingProgressStoreTests.swift"; sourceTree = "<group>"; };
 		100000451000004510000045 /* BookImportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/BookImportServiceTests.swift"; sourceTree = "<group>"; };
+		100000461000004610000046 /* ReaderPageRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderPageRequest.swift"; sourceTree = "<group>"; };
+		100000471000004710000047 /* ReaderPagingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderPagingService.swift"; sourceTree = "<group>"; };
+		100000481000004810000048 /* ReaderPagingServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ReaderPagingServiceTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -171,6 +177,8 @@
 				100000381000003810000038 /* ReaderOpeningRequest.swift */,
 				100000391000003910000039 /* ReaderOpeningResult.swift */,
 				100000401000004010000040 /* ReaderOpeningService.swift */,
+				100000461000004610000046 /* ReaderPageRequest.swift */,
+				100000471000004710000047 /* ReaderPagingService.swift */,
 				100000171000001710000017 /* ReadingProgress.swift */,
 				100000181000001810000018 /* ReadingProgressStore.swift */,
 				100000191000001910000019 /* TextWindow.swift */,
@@ -196,6 +204,7 @@
 			children = (
 				100000321000003210000032 /* ReaderEngineModelTests.swift */,
 				100000431000004310000043 /* ReaderOpeningServiceTests.swift */,
+				100000481000004810000048 /* ReaderPagingServiceTests.swift */,
 				100000331000003310000033 /* SettingsModelTests.swift */,
 				100000441000004410000044 /* ReadingProgressStoreTests.swift */,
 				100000451000004510000045 /* BookImportServiceTests.swift */,
@@ -329,6 +338,8 @@
 				200000352000003520000035 /* ReaderOpeningRequest.swift in Sources */,
 				200000362000003620000036 /* ReaderOpeningResult.swift in Sources */,
 				200000372000003720000037 /* ReaderOpeningService.swift in Sources */,
+				200000432000004320000043 /* ReaderPageRequest.swift in Sources */,
+				200000442000004420000044 /* ReaderPagingService.swift in Sources */,
 				200000172000001720000017 /* ReadingProgress.swift in Sources */,
 				200000182000001820000018 /* ReadingProgressStore.swift in Sources */,
 				200000192000001920000019 /* TextWindow.swift in Sources */,
@@ -352,6 +363,7 @@
 			files = (
 				200000322000003220000032 /* ReaderEngineModelTests.swift in Sources */,
 				200000402000004020000040 /* ReaderOpeningServiceTests.swift in Sources */,
+				200000452000004520000045 /* ReaderPagingServiceTests.swift in Sources */,
 				200000332000003320000033 /* SettingsModelTests.swift in Sources */,
 				200000412000004120000041 /* ReadingProgressStoreTests.swift in Sources */,
 				200000422000004220000042 /* BookImportServiceTests.swift in Sources */,

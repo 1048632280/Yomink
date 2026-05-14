@@ -66,6 +66,7 @@ final class AppCoordinator {
         let readerViewController = ReaderViewController(
             book: book,
             openingService: environment.readerOpeningService,
+            pagingService: environment.readerPagingService,
             readingSettingsStore: environment.readingSettingsStore,
             progressStore: environment.readingProgressStore
         )
