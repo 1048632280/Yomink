@@ -33,7 +33,19 @@ extension DatabaseMigrator {
             }
         }
 
+        migrator.registerMigration("createBookmarks") { database in
+            try database.create(table: "bookmarks", ifNotExists: true) { table in
+                table.column("id", .text).primaryKey()
+                table.column("bookID", .text).notNull()
+                table.column("title", .text).notNull()
+                table.column("byteOffset", .integer).notNull()
+                table.column("createdAt", .double).notNull()
+            }
+            try database.execute(
+                sql: "CREATE INDEX IF NOT EXISTS bookmarks_on_bookID ON bookmarks(bookID)"
+            )
+        }
+
         return migrator
     }
 }
-

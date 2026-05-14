@@ -8,6 +8,7 @@ final class ReaderViewController: UIViewController {
     private let book: BookRecord
     private let openingService: ReaderOpeningService
     private let pagingService: ReaderPagingService
+    private let bookmarkService: ReadingBookmarkService
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
@@ -28,12 +29,14 @@ final class ReaderViewController: UIViewController {
         book: BookRecord,
         openingService: ReaderOpeningService,
         pagingService: ReaderPagingService,
+        bookmarkService: ReadingBookmarkService,
         readingSettingsStore: ReadingSettingsStore,
         progressStore: ReadingProgressStore
     ) {
         self.book = book
         self.openingService = openingService
         self.pagingService = pagingService
+        self.bookmarkService = bookmarkService
         self.readingSettingsStore = readingSettingsStore
         self.progressStore = progressStore
 
@@ -107,12 +110,26 @@ final class ReaderViewController: UIViewController {
     }
 
     private func configureNavigationItems() {
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "textformat.size"),
-            style: .plain,
-            target: self,
-            action: #selector(showReadingSettings)
-        )
+        navigationItem.rightBarButtonItems = [
+            UIBarButtonItem(
+                image: UIImage(systemName: "textformat.size"),
+                style: .plain,
+                target: self,
+                action: #selector(showReadingSettings)
+            ),
+            UIBarButtonItem(
+                image: UIImage(systemName: "bookmark"),
+                style: .plain,
+                target: self,
+                action: #selector(addBookmark)
+            ),
+            UIBarButtonItem(
+                image: UIImage(systemName: "list.bullet"),
+                style: .plain,
+                target: self,
+                action: #selector(showBookmarks)
+            )
+        ]
     }
 
     private func configureStatusBar() {
@@ -176,6 +193,72 @@ final class ReaderViewController: UIViewController {
         applyTheme(activeSettings.theme)
         refreshVisibleCellsForActiveSettings()
         openPage(preferredByteOffset: preferredByteOffset)
+    }
+
+    @objc private func addBookmark() {
+        updateCurrentPageFromVisiblePage()
+        guard let currentPage else {
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+            do {
+                _ = try await bookmarkService.addBookmark(bookID: book.id, page: currentPage)
+                showTransientNotice(title: "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}")
+            } catch {
+                showTransientNotice(title: "\u{4E66}\u{7B7E}\u{4FDD}\u{5B58}\u{5931}\u{8D25}")
+            }
+        }
+    }
+
+    @objc private func showBookmarks() {
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let bookmarks = try await bookmarkService.bookmarks(bookID: book.id)
+                presentBookmarks(bookmarks)
+            } catch {
+                showTransientNotice(title: "\u{4E66}\u{7B7E}\u{52A0}\u{8F7D}\u{5931}\u{8D25}")
+            }
+        }
+    }
+
+    private func presentBookmarks(_ bookmarks: [ReadingBookmark]) {
+        guard !bookmarks.isEmpty else {
+            showTransientNotice(title: "\u{6682}\u{65E0}\u{4E66}\u{7B7E}")
+            return
+        }
+
+        let listViewController = BookmarkListViewController(bookmarks: bookmarks)
+        listViewController.onBookmarkSelected = { [weak self] bookmark in
+            self?.jumpToBookmark(bookmark)
+        }
+        let navigationController = UINavigationController(rootViewController: listViewController)
+        if let sheet = navigationController.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(navigationController, animated: true)
+    }
+
+    private func jumpToBookmark(_ bookmark: ReadingBookmark) {
+        saveCurrentProgress()
+        progressStore.remember(
+            ReadingProgress(
+                bookID: book.id,
+                byteOffset: bookmark.byteOffset,
+                updatedAt: Date()
+            )
+        )
+        progressStore.flushPendingProgress()
+        pagingService.removeCachedPages()
+        openPage(preferredByteOffset: bookmark.byteOffset)
     }
 
     private func refreshVisibleCellsForActiveSettings() {
@@ -419,6 +502,14 @@ final class ReaderViewController: UIViewController {
                 didReachEndOfBook: didReachEndOfBook
             )
         )
+    }
+
+    private func showTransientNotice(title: String) {
+        let alert = UIAlertController(title: title, message: nil, preferredStyle: .alert)
+        present(alert, animated: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak alert] in
+            alert?.dismiss(animated: true)
+        }
     }
 
     private func showOpeningError() {

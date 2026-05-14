@@ -70,6 +70,7 @@ final class AppCoordinator {
             book: book,
             openingService: environment.readerOpeningService,
             pagingService: environment.readerPagingService,
+            bookmarkService: environment.readingBookmarkService,
             readingSettingsStore: environment.readingSettingsStore,
             progressStore: environment.readingProgressStore
         )
