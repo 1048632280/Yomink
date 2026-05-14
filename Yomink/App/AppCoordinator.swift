@@ -57,7 +57,10 @@ final class AppCoordinator {
                 bookshelfViewController?.refreshBooks()
                 openReader(book)
             } catch {
-                presentError(title: "导入失败", message: "无法导入这个 TXT 文件。")
+                presentError(
+                    title: "\u{5BFC}\u{5165}\u{5931}\u{8D25}",
+                    message: "\u{65E0}\u{6CD5}\u{5BFC}\u{5165}\u{8FD9}\u{4E2A} TXT \u{6587}\u{4EF6}\u{3002}"
+                )
             }
         }
     }
@@ -75,7 +78,7 @@ final class AppCoordinator {
 
     private func presentError(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "好", style: .default))
+        alert.addAction(UIAlertAction(title: "\u{597D}", style: .default))
         navigationController.present(alert, animated: true)
     }
 }

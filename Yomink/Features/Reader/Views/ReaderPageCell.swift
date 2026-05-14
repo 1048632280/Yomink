@@ -26,17 +26,19 @@ final class ReaderPageCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        pageView.configure(text: "", layout: .defaultPhone)
+        pageView.configure(text: "", settings: .standard)
     }
 
-    func configure(page: ReaderPage, layout: ReadingLayout) {
-        pageView.configure(text: page.text, layout: layout)
+    func configure(page: ReaderPage, settings: ReadingSettings) {
+        let palette = ReadingThemePalette.palette(for: settings.theme)
+        contentView.backgroundColor = palette.background
+        pageView.configure(text: page.text, settings: settings)
     }
 }
 
 private final class CoreTextPageView: UIView {
     private var text = ""
-    private var layout = ReadingLayout.defaultPhone
+    private var settings = ReadingSettings.standard
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -50,9 +52,10 @@ private final class CoreTextPageView: UIView {
         nil
     }
 
-    func configure(text: String, layout: ReadingLayout) {
+    func configure(text: String, settings: ReadingSettings) {
         self.text = text
-        self.layout = layout
+        self.settings = settings
+        backgroundColor = ReadingThemePalette.palette(for: settings.theme).background
         setNeedsDisplay()
     }
 
@@ -67,12 +70,14 @@ private final class CoreTextPageView: UIView {
         context.translateBy(x: 0, y: bounds.height)
         context.scaleBy(x: 1, y: -1)
 
+        let layout = settings.layout
+        let palette = ReadingThemePalette.palette(for: settings.theme)
         let font = CTFontCreateWithName(layout.fontName as CFString, layout.fontSize, nil)
         let attributedString = NSAttributedString(
             string: text,
             attributes: [
                 NSAttributedString.Key(kCTFontAttributeName as String): font,
-                NSAttributedString.Key(kCTForegroundColorAttributeName as String): YominkTheme.primaryText.cgColor,
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): palette.primaryText.cgColor,
                 NSAttributedString.Key(kCTParagraphStyleAttributeName as String): makeParagraphStyle()
             ]
         )
@@ -85,6 +90,7 @@ private final class CoreTextPageView: UIView {
     }
 
     private var textRect: CGRect {
+        let layout = settings.layout
         CGRect(
             x: layout.contentInsets.left,
             y: layout.contentInsets.bottom,
@@ -94,6 +100,7 @@ private final class CoreTextPageView: UIView {
     }
 
     private func makeParagraphStyle() -> CTParagraphStyle {
+        let layout = settings.layout
         var lineSpacing = layout.lineSpacing
         var paragraphSpacing = layout.paragraphSpacing
         return withUnsafePointer(to: &lineSpacing) { lineSpacingPointer in
@@ -117,4 +124,3 @@ private final class CoreTextPageView: UIView {
         }
     }
 }
-

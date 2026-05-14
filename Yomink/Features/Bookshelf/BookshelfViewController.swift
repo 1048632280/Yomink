@@ -95,8 +95,8 @@ final class BookshelfViewController: UIViewController {
                 content.image = UIImage(systemName: "book.closed")
                 cell.accessories = [.disclosureIndicator()]
             case .emptyState:
-                content.text = "尚未导入书籍"
-                content.secondaryText = "从右上角添加 TXT 文件开始阅读"
+                content.text = "\u{5C1A}\u{672A}\u{5BFC}\u{5165}\u{4E66}\u{7C4D}"
+                content.secondaryText = "\u{4ECE}\u{53F3}\u{4E0A}\u{89D2}\u{6DFB}\u{52A0} TXT \u{6587}\u{4EF6}\u{5F00}\u{59CB}\u{9605}\u{8BFB}"
                 content.image = UIImage(systemName: "tray")
                 cell.accessories = []
             }
@@ -130,7 +130,10 @@ final class BookshelfViewController: UIViewController {
     }
 
     @objc private func showGroups() {
-        presentPlaceholder(title: "分组", message: "书架分组将在后续阶段接入。")
+        presentPlaceholder(
+            title: "\u{5206}\u{7EC4}",
+            message: "\u{4E66}\u{67B6}\u{5206}\u{7EC4}\u{5C06}\u{5728}\u{540E}\u{7EED}\u{9636}\u{6BB5}\u{63A5}\u{5165}\u{3002}"
+        )
     }
 
     @objc private func showImportOptions() {
@@ -138,20 +141,24 @@ final class BookshelfViewController: UIViewController {
     }
 
     @objc private func showSearch() {
-        presentPlaceholder(title: "搜索", message: "书名搜索和历史记录将在后续阶段接入。")
+        presentPlaceholder(
+            title: "\u{641C}\u{7D22}",
+            message: "\u{4E66}\u{540D}\u{641C}\u{7D22}\u{548C}\u{5386}\u{53F2}\u{8BB0}\u{5F55}\u{5C06}\u{5728}\u{540E}\u{7EED}\u{9636}\u{6BB5}\u{63A5}\u{5165}\u{3002}"
+        )
     }
 
     private func presentPlaceholder(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "好", style: .default))
+        alert.addAction(UIAlertAction(title: "\u{597D}", style: .default))
         present(alert, animated: true)
     }
 
     private static func subtitle(for book: BookRecord) -> String {
         let size = ByteCountFormatter.string(fromByteCount: Int64(book.fileSize), countStyle: .file)
-        return "\(size) · \(book.encoding.rawValue)"
+        return "\(size) \u{00B7} \(book.encoding.rawValue)"
     }
 }
+
 extension BookshelfViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)

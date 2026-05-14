@@ -20,7 +20,8 @@ final class ReaderViewController: UIViewController {
     private var nextPageTask: Task<Void, Never>?
     private var didStartOpening = false
     private var didReachEndOfBook = false
-    private var activeLayout = ReadingSettings.standard.layout
+    private var activeSettings = ReadingSettings.standard
+    private var pagingGeneration = 0
     private let maximumResidentPages = 12
 
     init(
@@ -52,7 +53,8 @@ final class ReaderViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = book.title
-        view.backgroundColor = YominkTheme.background
+        configureNavigationItems()
+        applyTheme(activeSettings.theme)
         configureCollectionView()
         configureStatusBar()
         configureDataSource()
@@ -89,7 +91,6 @@ final class ReaderViewController: UIViewController {
 
     private func configureCollectionView() {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.backgroundColor = YominkTheme.background
         collectionView.isPagingEnabled = true
         collectionView.showsHorizontalScrollIndicator = false
         collectionView.showsVerticalScrollIndicator = false
@@ -103,6 +104,15 @@ final class ReaderViewController: UIViewController {
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
+    }
+
+    private func configureNavigationItems() {
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "textformat.size"),
+            style: .plain,
+            target: self,
+            action: #selector(showReadingSettings)
+        )
     }
 
     private func configureStatusBar() {
@@ -127,8 +137,54 @@ final class ReaderViewController: UIViewController {
                   ) as? ReaderPageCell else {
                 return UICollectionViewCell()
             }
-            cell.configure(page: page, layout: activeLayout)
+            cell.configure(page: page, settings: activeSettings)
             return cell
+        }
+    }
+
+    private func applyTheme(_ theme: ReadingTheme) {
+        let palette = ReadingThemePalette.palette(for: theme)
+        view.backgroundColor = palette.background
+        collectionView.backgroundColor = palette.background
+        statusBarView.applyTheme(theme)
+    }
+
+    @objc private func showReadingSettings() {
+        updateCurrentPageFromVisiblePage()
+        var settings = activeSettings
+        settings.layout.viewportSize = collectionView.bounds.size
+
+        let settingsViewController = ReaderSettingsViewController(settings: settings)
+        settingsViewController.onApply = { [weak self] newSettings in
+            self?.applyReadingSettings(newSettings)
+        }
+
+        let navigationController = UINavigationController(rootViewController: settingsViewController)
+        if let sheet = navigationController.sheetPresentationController {
+            sheet.detents = [.medium()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(navigationController, animated: true)
+    }
+
+    private func applyReadingSettings(_ settings: ReadingSettings) {
+        updateCurrentPageFromVisiblePage()
+        let preferredByteOffset = currentPage?.startByteOffset
+        activeSettings = settings.normalized(viewportSize: collectionView.bounds.size)
+        readingSettingsStore.save(activeSettings)
+        pagingService.removeCachedPages()
+        applyTheme(activeSettings.theme)
+        refreshVisibleCellsForActiveSettings()
+        openPage(preferredByteOffset: preferredByteOffset)
+    }
+
+    private func refreshVisibleCellsForActiveSettings() {
+        for indexPath in collectionView.indexPathsForVisibleItems {
+            guard pages.indices.contains(indexPath.item),
+                  let cell = collectionView.cellForItem(at: indexPath) as? ReaderPageCell else {
+                continue
+            }
+            cell.configure(page: pages[indexPath.item], settings: activeSettings)
         }
     }
 
@@ -140,15 +196,26 @@ final class ReaderViewController: UIViewController {
         }
 
         didStartOpening = true
-        var settings = readingSettingsStore.load()
-        settings.layout.viewportSize = collectionView.bounds.size
-        activeLayout = settings.layout
+        activeSettings = readingSettingsStore.load().normalized(viewportSize: collectionView.bounds.size)
+        applyTheme(activeSettings.theme)
+        openPage(preferredByteOffset: nil)
+    }
 
+    private func openPage(preferredByteOffset: UInt64?) {
+        openingTask?.cancel()
+        nextPageTask?.cancel()
+        nextPageTask = nil
+        pages = []
+        currentPage = nil
+        applyPagesSnapshot()
+        didReachEndOfBook = false
+        pagingGeneration += 1
+        let generation = pagingGeneration
         let request = ReaderOpeningRequest(
             bookID: book.id,
             viewportSize: collectionView.bounds.size,
-            layout: settings.layout,
-            preferredByteOffset: nil
+            layout: activeSettings.layout,
+            preferredByteOffset: preferredByteOffset
         )
 
         openingTask = Task { [weak self] in
@@ -158,9 +225,18 @@ final class ReaderViewController: UIViewController {
 
             do {
                 let result = try await openingService.openFirstPage(request)
+                guard pagingGeneration == generation else {
+                    return
+                }
+                openingTask = nil
                 applyInitialPage(result.page)
+                collectionView.setContentOffset(.zero, animated: false)
                 loadNextPageIfNeeded()
             } catch {
+                guard pagingGeneration == generation else {
+                    return
+                }
+                openingTask = nil
                 showOpeningError()
             }
         }
@@ -170,6 +246,7 @@ final class ReaderViewController: UIViewController {
         pages = [page]
         currentPage = page
         applyPagesSnapshot()
+        refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: false)
     }
 
@@ -181,6 +258,7 @@ final class ReaderViewController: UIViewController {
         let removedPrefixCount = trimResidentPagesIfNeeded()
         applyPagesSnapshot()
         adjustContentOffsetAfterRemovingPrefix(removedPrefixCount)
+        refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: false)
     }
 
@@ -203,8 +281,9 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             startByteOffset: lastPage.endByteOffset,
             pageIndex: lastPage.pageIndex + 1,
-            layout: activeLayout
+            layout: activeSettings.layout
         )
+        let generation = pagingGeneration
 
         nextPageTask = Task { [weak self] in
             guard let self else {
@@ -214,6 +293,9 @@ final class ReaderViewController: UIViewController {
             updateSessionState(isLoadingNextPage: true)
             do {
                 let nextPage = try await pagingService.page(request)
+                guard pagingGeneration == generation else {
+                    return
+                }
                 nextPageTask = nil
                 guard let nextPage else {
                     didReachEndOfBook = true
@@ -222,6 +304,9 @@ final class ReaderViewController: UIViewController {
                 }
                 appendPage(nextPage)
             } catch {
+                guard pagingGeneration == generation else {
+                    return
+                }
                 nextPageTask = nil
                 updateSessionState(isLoadingNextPage: false)
             }

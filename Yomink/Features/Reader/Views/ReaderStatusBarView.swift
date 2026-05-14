@@ -25,16 +25,21 @@ final class ReaderStatusBarView: UIView {
         }
     }
 
+    func applyTheme(_ theme: ReadingTheme) {
+        let palette = ReadingThemePalette.palette(for: theme)
+        backgroundColor = palette.chromeBackground
+        pageLabel.textColor = palette.secondaryText
+        progressLabel.textColor = palette.secondaryText
+    }
+
     private func configureView() {
         isUserInteractionEnabled = false
-        backgroundColor = YominkTheme.background.withAlphaComponent(0.86)
+        applyTheme(.paper)
 
         pageLabel.font = .preferredFont(forTextStyle: .caption1)
-        pageLabel.textColor = YominkTheme.secondaryText
         pageLabel.adjustsFontForContentSizeCategory = true
 
         progressLabel.font = .preferredFont(forTextStyle: .caption1)
-        progressLabel.textColor = YominkTheme.secondaryText
         progressLabel.textAlignment = .right
         progressLabel.adjustsFontForContentSizeCategory = true
 
