@@ -91,7 +91,7 @@ private final class CoreTextPageView: UIView {
 
     private var textRect: CGRect {
         let layout = settings.layout
-        CGRect(
+        return CGRect(
             x: layout.contentInsets.left,
             y: layout.contentInsets.bottom,
             width: max(1, bounds.width - layout.contentInsets.left - layout.contentInsets.right),
