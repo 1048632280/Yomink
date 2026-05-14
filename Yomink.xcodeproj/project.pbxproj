@@ -53,42 +53,42 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		100000001000000010000000 /* Yomink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Yomink.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		100000341000003410000034 /* YominkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YominkTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		100000011000000110000001 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppCoordinator.swift; sourceTree = "<group>"; };
-		100000021000000210000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppDelegate.swift; sourceTree = "<group>"; };
-		100000031000000310000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AppEnvironment.swift; sourceTree = "<group>"; };
-		100000041000000410000004 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/SceneDelegate.swift; sourceTree = "<group>"; };
-		100000351000003510000035 /* Yomink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App/Yomink.entitlements; sourceTree = "<group>"; };
-		100000361000003610000036 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		100000051000000510000005 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/DatabaseManager.swift; sourceTree = "<group>"; };
-		100000061000000610000006 /* DatabaseMigrator+Yomink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/Migrations/DatabaseMigrator+Yomink.swift; sourceTree = "<group>"; };
-		100000071000000710000007 /* BookRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/Models/BookRecord.swift; sourceTree = "<group>"; };
-		100000081000000810000008 /* BookRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Database/Repositories/BookRepository.swift; sourceTree = "<group>"; };
-		100000091000000910000009 /* ChapterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/ChapterParsing/ChapterParser.swift; sourceTree = "<group>"; };
-		100000101000001010000010 /* TextDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Encoding/TextDecoder.swift; sourceTree = "<group>"; };
-		100000111000001110000011 /* TextEncoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Encoding/TextEncoding.swift; sourceTree = "<group>"; };
-		100000121000001210000012 /* BookFileMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/FileMapping/BookFileMapping.swift; sourceTree = "<group>"; };
-		100000131000001310000013 /* ReaderPageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/PageCache/ReaderPageCache.swift; sourceTree = "<group>"; };
-		100000141000001410000014 /* CoreTextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Pagination/CoreTextPaginator.swift; sourceTree = "<group>"; };
-		100000151000001510000015 /* PageByteRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Pagination/PageByteRange.swift; sourceTree = "<group>"; };
-		100000161000001610000016 /* ReadingLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/Pagination/ReadingLayout.swift; sourceTree = "<group>"; };
-		100000171000001710000017 /* ReadingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/ProgressLocator/ReadingProgress.swift; sourceTree = "<group>"; };
-		100000181000001810000018 /* ReadingProgressStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/ProgressLocator/ReadingProgressStore.swift; sourceTree = "<group>"; };
-		100000191000001910000019 /* TextWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/ReaderEngine/TextWindow/TextWindow.swift; sourceTree = "<group>"; };
-		100000201000002010000020 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Search/SearchIndexService.swift; sourceTree = "<group>"; };
-		100000211000002110000021 /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Settings/AppSettingsStore.swift; sourceTree = "<group>"; };
-		100000221000002210000022 /* ReadingSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Core/Settings/ReadingSettingsStore.swift; sourceTree = "<group>"; };
-		100000231000002310000023 /* BookshelfViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Bookshelf/BookshelfViewController.swift; sourceTree = "<group>"; };
-		100000241000002410000024 /* BookshelfViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Bookshelf/BookshelfViewModel.swift; sourceTree = "<group>"; };
-		100000251000002510000025 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Import/ImportCoordinator.swift; sourceTree = "<group>"; };
-		100000261000002610000026 /* ReaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Features/Reader/ReaderViewController.swift; sourceTree = "<group>"; };
-		100000271000002710000027 /* PlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Components/PlaceholderView.swift; sourceTree = "<group>"; };
-		100000281000002810000028 /* YominkTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI/Themes/YominkTheme.swift; sourceTree = "<group>"; };
-		100000291000002910000029 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Resources/Assets.xcassets; sourceTree = "<group>"; };
-		100000301000003010000030 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = Resources/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		100000321000003210000032 /* ReaderEngineModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderEngineTests/ReaderEngineModelTests.swift; sourceTree = "<group>"; };
-		100000331000003310000033 /* SettingsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseTests/SettingsModelTests.swift; sourceTree = "<group>"; };
+		100000001000000010000000 /* Yomink.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Yomink.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000341000003410000034 /* YominkTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "YominkTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000011000000110000001 /* AppCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppCoordinator.swift"; sourceTree = "<group>"; };
+		100000021000000210000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppDelegate.swift"; sourceTree = "<group>"; };
+		100000031000000310000003 /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/AppEnvironment.swift"; sourceTree = "<group>"; };
+		100000041000000410000004 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "App/SceneDelegate.swift"; sourceTree = "<group>"; };
+		100000351000003510000035 /* Yomink.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "App/Yomink.entitlements"; sourceTree = "<group>"; };
+		100000361000003610000036 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		100000051000000510000005 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/DatabaseManager.swift"; sourceTree = "<group>"; };
+		100000061000000610000006 /* DatabaseMigrator+Yomink.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Migrations/DatabaseMigrator+Yomink.swift"; sourceTree = "<group>"; };
+		100000071000000710000007 /* BookRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Models/BookRecord.swift"; sourceTree = "<group>"; };
+		100000081000000810000008 /* BookRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Repositories/BookRepository.swift"; sourceTree = "<group>"; };
+		100000091000000910000009 /* ChapterParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ChapterParsing/ChapterParser.swift"; sourceTree = "<group>"; };
+		100000101000001010000010 /* TextDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Encoding/TextDecoder.swift"; sourceTree = "<group>"; };
+		100000111000001110000011 /* TextEncoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Encoding/TextEncoding.swift"; sourceTree = "<group>"; };
+		100000121000001210000012 /* BookFileMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/FileMapping/BookFileMapping.swift"; sourceTree = "<group>"; };
+		100000131000001310000013 /* ReaderPageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/PageCache/ReaderPageCache.swift"; sourceTree = "<group>"; };
+		100000141000001410000014 /* CoreTextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/CoreTextPaginator.swift"; sourceTree = "<group>"; };
+		100000151000001510000015 /* PageByteRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/PageByteRange.swift"; sourceTree = "<group>"; };
+		100000161000001610000016 /* ReadingLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/ReadingLayout.swift"; sourceTree = "<group>"; };
+		100000171000001710000017 /* ReadingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingProgress.swift"; sourceTree = "<group>"; };
+		100000181000001810000018 /* ReadingProgressStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingProgressStore.swift"; sourceTree = "<group>"; };
+		100000191000001910000019 /* TextWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/TextWindow/TextWindow.swift"; sourceTree = "<group>"; };
+		100000201000002010000020 /* SearchIndexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Search/SearchIndexService.swift"; sourceTree = "<group>"; };
+		100000211000002110000021 /* AppSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Settings/AppSettingsStore.swift"; sourceTree = "<group>"; };
+		100000221000002210000022 /* ReadingSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Settings/ReadingSettingsStore.swift"; sourceTree = "<group>"; };
+		100000231000002310000023 /* BookshelfViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Bookshelf/BookshelfViewController.swift"; sourceTree = "<group>"; };
+		100000241000002410000024 /* BookshelfViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Bookshelf/BookshelfViewModel.swift"; sourceTree = "<group>"; };
+		100000251000002510000025 /* ImportCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Import/ImportCoordinator.swift"; sourceTree = "<group>"; };
+		100000261000002610000026 /* ReaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/ReaderViewController.swift"; sourceTree = "<group>"; };
+		100000271000002710000027 /* PlaceholderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Components/PlaceholderView.swift"; sourceTree = "<group>"; };
+		100000281000002810000028 /* YominkTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Themes/YominkTheme.swift"; sourceTree = "<group>"; };
+		100000291000002910000029 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Resources/Assets.xcassets"; sourceTree = "<group>"; };
+		100000301000003010000030 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Resources/LaunchScreen.storyboard"; sourceTree = "<group>"; };
+		100000321000003210000032 /* ReaderEngineModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ReaderEngineModelTests.swift"; sourceTree = "<group>"; };
+		100000331000003310000033 /* SettingsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/SettingsModelTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
