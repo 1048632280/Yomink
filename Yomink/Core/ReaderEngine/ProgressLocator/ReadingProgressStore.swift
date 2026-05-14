@@ -1,6 +1,6 @@
 import Foundation
 
-final class ReadingProgressStore {
+final class ReadingProgressStore: @unchecked Sendable {
     private let databaseManager: DatabaseManager
     private var pendingProgress: ReadingProgress?
 
@@ -12,6 +12,10 @@ final class ReadingProgressStore {
         pendingProgress = progress
     }
 
+    func progress(for bookID: UUID) throws -> ReadingProgress? {
+        try databaseManager.readProgress(bookID: bookID)
+    }
+
     func flushPendingProgress() {
         guard let progress = pendingProgress else {
             return
@@ -20,4 +24,3 @@ final class ReadingProgressStore {
         databaseManager.writeProgress(progress)
     }
 }
-

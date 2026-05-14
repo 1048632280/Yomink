@@ -3,6 +3,7 @@ import Foundation
 
 final class BookshelfViewModel {
     enum Item: Hashable {
+        case book(BookRecord)
         case emptyState
     }
 
@@ -18,7 +19,11 @@ final class BookshelfViewModel {
     }
 
     func refresh() {
-        items.send([.emptyState])
+        do {
+            let books = try bookRepository.fetchBooks(sortMode: appSettingsStore.bookshelfSortMode)
+            items.send(books.isEmpty ? [.emptyState] : books.map(Item.book))
+        } catch {
+            items.send([.emptyState])
+        }
     }
 }
-

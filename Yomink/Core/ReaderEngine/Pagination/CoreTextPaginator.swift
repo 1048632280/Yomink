@@ -8,6 +8,11 @@ enum PaginationError: Error {
     case windowTooLarge
 }
 
+struct PaginatedFirstPage: Hashable, Sendable {
+    let pageByteRange: PageByteRange
+    let text: String
+}
+
 struct CoreTextPaginator {
     static let maximumUTF16Length = 120_000
 
@@ -16,6 +21,20 @@ struct CoreTextPaginator {
         layout: ReadingLayout,
         bookID: UUID
     ) throws -> PageByteRange {
+        try paginateFirstPageWithText(
+            window: window,
+            layout: layout,
+            bookID: bookID,
+            encoding: .utf8
+        ).pageByteRange
+    }
+
+    func paginateFirstPageWithText(
+        window: TextWindow,
+        layout: ReadingLayout,
+        bookID: UUID,
+        encoding: TextEncoding
+    ) throws -> PaginatedFirstPage {
         guard !Thread.isMainThread else {
             assertionFailure("CoreText pagination must not run on the main thread.")
             throw PaginationError.invalidLayout
@@ -45,16 +64,19 @@ struct CoreTextPaginator {
         path.addRect(textRect)
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
         let visibleRange = CTFrameGetVisibleStringRange(frame)
+        let visibleText = window.text.prefixUTF16Units(visibleRange.length)
         let estimatedEndOffset = estimateByteOffset(
-            visibleUTF16Length: visibleRange.length,
-            window: window
+            visibleText: visibleText,
+            window: window,
+            encoding: encoding
         )
 
-        return PageByteRange(
+        let pageByteRange = PageByteRange(
             bookID: bookID,
             pageIndex: 0,
             byteRange: window.startByteOffset..<estimatedEndOffset
         )
+        return PaginatedFirstPage(pageByteRange: pageByteRange, text: visibleText)
     }
 
     private func makeParagraphStyle(layout: ReadingLayout) -> CTParagraphStyle {
@@ -81,13 +103,25 @@ struct CoreTextPaginator {
         }
     }
 
-    private func estimateByteOffset(visibleUTF16Length: Int, window: TextWindow) -> UInt64 {
-        guard visibleUTF16Length > 0 else {
+    private func estimateByteOffset(visibleText: String, window: TextWindow, encoding: TextEncoding) -> UInt64 {
+        guard !visibleText.isEmpty else {
             return window.startByteOffset
         }
 
-        let visibleText = String(window.text.prefix(visibleUTF16Length))
-        let visibleByteCount = UInt64(visibleText.utf8.count)
+        let visibleByteCount = UInt64(visibleText.data(using: encoding.stringEncoding)?.count ?? visibleText.utf8.count)
         return min(window.endByteOffset, window.startByteOffset + visibleByteCount)
+    }
+}
+
+private extension String {
+    func prefixUTF16Units(_ length: Int) -> String {
+        let clampedLength = max(0, min(length, utf16.count))
+        var utf16Index = utf16.index(utf16.startIndex, offsetBy: clampedLength)
+        if let endIndex = String.Index(utf16Index, within: self) {
+            return String(self[..<endIndex])
+        }
+        utf16Index = utf16.index(before: utf16Index)
+        let endIndex = String.Index(utf16Index, within: self) ?? startIndex
+        return String(self[..<endIndex])
     }
 }

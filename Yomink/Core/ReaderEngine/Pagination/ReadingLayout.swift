@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-struct ReadingLayout: Hashable, Codable {
+struct ReadingLayout: Hashable, Codable, Sendable {
     var viewportSize: CGSize
     var contentInsets: CodableEdgeInsets
     var fontName: String
@@ -19,10 +19,9 @@ struct ReadingLayout: Hashable, Codable {
     )
 }
 
-struct CodableEdgeInsets: Hashable, Codable {
+struct CodableEdgeInsets: Hashable, Codable, Sendable {
     var top: CGFloat
     var left: CGFloat
     var bottom: CGFloat
     var right: CGFloat
 }
-

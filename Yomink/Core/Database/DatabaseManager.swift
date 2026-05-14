@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-final class DatabaseManager {
+final class DatabaseManager: @unchecked Sendable {
     let writer: (any DatabaseWriter)?
 
     init(writer: (any DatabaseWriter)?) {
@@ -22,6 +22,12 @@ final class DatabaseManager {
             assertionFailure("Database initialization failed: \(error)")
             return DatabaseManager(writer: nil)
         }
+    }
+
+    static func inMemory() throws -> DatabaseManager {
+        let queue = try DatabaseQueue(path: ":memory:")
+        try DatabaseMigrator.yominkMigrator.migrate(queue)
+        return DatabaseManager(writer: queue)
     }
 
     func writeProgress(_ progress: ReadingProgress) {
@@ -48,6 +54,34 @@ final class DatabaseManager {
             }
         } catch {
             assertionFailure("Failed to persist reading progress: \(error)")
+        }
+    }
+
+    func readProgress(bookID: UUID) throws -> ReadingProgress? {
+        guard let writer else {
+            return nil
+        }
+
+        return try writer.read { database in
+            guard let row = try Row.fetchOne(
+                database,
+                sql: "SELECT bookID, byteOffset, updatedAt FROM readingProgress WHERE bookID = ?",
+                arguments: [bookID.uuidString]
+            ) else {
+                return nil
+            }
+
+            let storedBookIDString: String = row["bookID"]
+            let storedByteOffset: Int64 = row["byteOffset"]
+            let storedUpdatedAt: Double = row["updatedAt"]
+            let storedBookID = UUID(uuidString: storedBookIDString) ?? bookID
+            let byteOffset = UInt64(max(Int64(0), storedByteOffset))
+            let updatedAt = Date(timeIntervalSince1970: storedUpdatedAt)
+            return ReadingProgress(
+                bookID: storedBookID,
+                byteOffset: byteOffset,
+                updatedAt: updatedAt
+            )
         }
     }
 }

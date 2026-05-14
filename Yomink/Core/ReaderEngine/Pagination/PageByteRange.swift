@@ -1,6 +1,6 @@
 import Foundation
 
-struct PageByteRange: Hashable, Codable {
+struct PageByteRange: Hashable, Codable, Sendable {
     let bookID: UUID
     let pageIndex: Int
     let byteRange: Range<UInt64>
@@ -13,4 +13,3 @@ struct PageByteRange: Hashable, Codable {
         byteRange.upperBound
     }
 }
-

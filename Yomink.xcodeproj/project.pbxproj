@@ -40,6 +40,15 @@
 		200000312000003120000031 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 600000026000000260000002 /* GRDB */; };
 		200000322000003220000032 /* ReaderEngineModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000321000003210000032 /* ReaderEngineModelTests.swift */; };
 		200000332000003320000033 /* SettingsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000331000003310000033 /* SettingsModelTests.swift */; };
+		200000342000003420000034 /* ReaderPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000371000003710000037 /* ReaderPage.swift */; };
+		200000352000003520000035 /* ReaderOpeningRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000381000003810000038 /* ReaderOpeningRequest.swift */; };
+		200000362000003620000036 /* ReaderOpeningResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000391000003910000039 /* ReaderOpeningResult.swift */; };
+		200000372000003720000037 /* ReaderOpeningService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000401000004010000040 /* ReaderOpeningService.swift */; };
+		200000382000003820000038 /* BookImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000411000004110000041 /* BookImportService.swift */; };
+		200000392000003920000039 /* ReaderPageCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000421000004210000042 /* ReaderPageCell.swift */; };
+		200000402000004020000040 /* ReaderOpeningServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000431000004310000043 /* ReaderOpeningServiceTests.swift */; };
+		200000412000004120000041 /* ReadingProgressStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000441000004410000044 /* ReadingProgressStoreTests.swift */; };
+		200000422000004220000042 /* BookImportServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000451000004510000045 /* BookImportServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -89,6 +98,15 @@
 		100000301000003010000030 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = "Resources/LaunchScreen.storyboard"; sourceTree = "<group>"; };
 		100000321000003210000032 /* ReaderEngineModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ReaderEngineModelTests.swift"; sourceTree = "<group>"; };
 		100000331000003310000033 /* SettingsModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/SettingsModelTests.swift"; sourceTree = "<group>"; };
+		100000371000003710000037 /* ReaderPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderPage.swift"; sourceTree = "<group>"; };
+		100000381000003810000038 /* ReaderOpeningRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderOpeningRequest.swift"; sourceTree = "<group>"; };
+		100000391000003910000039 /* ReaderOpeningResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderOpeningResult.swift"; sourceTree = "<group>"; };
+		100000401000004010000040 /* ReaderOpeningService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderOpeningService.swift"; sourceTree = "<group>"; };
+		100000411000004110000041 /* BookImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Import/BookImportService.swift"; sourceTree = "<group>"; };
+		100000421000004210000042 /* ReaderPageCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/ReaderPageCell.swift"; sourceTree = "<group>"; };
+		100000431000004310000043 /* ReaderOpeningServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ReaderOpeningServiceTests.swift"; sourceTree = "<group>"; };
+		100000441000004410000044 /* ReadingProgressStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/ReadingProgressStoreTests.swift"; sourceTree = "<group>"; };
+		100000451000004510000045 /* BookImportServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/BookImportServiceTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +167,10 @@
 				100000141000001410000014 /* CoreTextPaginator.swift */,
 				100000151000001510000015 /* PageByteRange.swift */,
 				100000161000001610000016 /* ReadingLayout.swift */,
+				100000371000003710000037 /* ReaderPage.swift */,
+				100000381000003810000038 /* ReaderOpeningRequest.swift */,
+				100000391000003910000039 /* ReaderOpeningResult.swift */,
+				100000401000004010000040 /* ReaderOpeningService.swift */,
 				100000171000001710000017 /* ReadingProgress.swift */,
 				100000181000001810000018 /* ReadingProgressStore.swift */,
 				100000191000001910000019 /* TextWindow.swift */,
@@ -157,8 +179,10 @@
 				100000221000002210000022 /* ReadingSettingsStore.swift */,
 				100000231000002310000023 /* BookshelfViewController.swift */,
 				100000241000002410000024 /* BookshelfViewModel.swift */,
+				100000411000004110000041 /* BookImportService.swift */,
 				100000251000002510000025 /* ImportCoordinator.swift */,
 				100000261000002610000026 /* ReaderViewController.swift */,
+				100000421000004210000042 /* ReaderPageCell.swift */,
 				100000271000002710000027 /* PlaceholderView.swift */,
 				100000281000002810000028 /* YominkTheme.swift */,
 				100000291000002910000029 /* Assets.xcassets */,
@@ -171,7 +195,10 @@
 			isa = PBXGroup;
 			children = (
 				100000321000003210000032 /* ReaderEngineModelTests.swift */,
+				100000431000004310000043 /* ReaderOpeningServiceTests.swift */,
 				100000331000003310000033 /* SettingsModelTests.swift */,
+				100000441000004410000044 /* ReadingProgressStoreTests.swift */,
+				100000451000004510000045 /* BookImportServiceTests.swift */,
 			);
 			path = YominkTests;
 			sourceTree = "<group>";
@@ -298,6 +325,10 @@
 				200000142000001420000014 /* CoreTextPaginator.swift in Sources */,
 				200000152000001520000015 /* PageByteRange.swift in Sources */,
 				200000162000001620000016 /* ReadingLayout.swift in Sources */,
+				200000342000003420000034 /* ReaderPage.swift in Sources */,
+				200000352000003520000035 /* ReaderOpeningRequest.swift in Sources */,
+				200000362000003620000036 /* ReaderOpeningResult.swift in Sources */,
+				200000372000003720000037 /* ReaderOpeningService.swift in Sources */,
 				200000172000001720000017 /* ReadingProgress.swift in Sources */,
 				200000182000001820000018 /* ReadingProgressStore.swift in Sources */,
 				200000192000001920000019 /* TextWindow.swift in Sources */,
@@ -306,8 +337,10 @@
 				200000222000002220000022 /* ReadingSettingsStore.swift in Sources */,
 				200000232000002320000023 /* BookshelfViewController.swift in Sources */,
 				200000242000002420000024 /* BookshelfViewModel.swift in Sources */,
+				200000382000003820000038 /* BookImportService.swift in Sources */,
 				200000252000002520000025 /* ImportCoordinator.swift in Sources */,
 				200000262000002620000026 /* ReaderViewController.swift in Sources */,
+				200000392000003920000039 /* ReaderPageCell.swift in Sources */,
 				200000272000002720000027 /* PlaceholderView.swift in Sources */,
 				200000282000002820000028 /* YominkTheme.swift in Sources */,
 			);
@@ -318,7 +351,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				200000322000003220000032 /* ReaderEngineModelTests.swift in Sources */,
+				200000402000004020000040 /* ReaderOpeningServiceTests.swift in Sources */,
 				200000332000003320000033 /* SettingsModelTests.swift in Sources */,
+				200000412000004120000041 /* ReadingProgressStoreTests.swift in Sources */,
+				200000422000004220000042 /* BookImportServiceTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

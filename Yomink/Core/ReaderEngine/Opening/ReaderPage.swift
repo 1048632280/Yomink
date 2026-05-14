@@ -1,6 +1,8 @@
 import Foundation
 
-struct TextWindow: Hashable, Sendable {
+struct ReaderPage: Hashable, Sendable {
+    let bookID: UUID
+    let pageIndex: Int
     let byteRange: Range<UInt64>
     let text: String
 
@@ -12,3 +14,4 @@ struct TextWindow: Hashable, Sendable {
         byteRange.upperBound
     }
 }
+

@@ -1,6 +1,6 @@
 import Foundation
 
-enum TextEncoding: String, Codable, CaseIterable {
+enum TextEncoding: String, Codable, CaseIterable, Sendable {
     case utf8
     case utf16LittleEndian
     case utf16BigEndian

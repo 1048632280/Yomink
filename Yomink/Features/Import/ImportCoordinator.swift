@@ -2,8 +2,20 @@ import UIKit
 import UniformTypeIdentifiers
 
 @MainActor
-final class ImportCoordinator {
+final class ImportCoordinator: NSObject, UIDocumentPickerDelegate {
+    var onPickedDocument: ((URL) -> Void)?
+
     func makeImportController() -> UIViewController {
-        UIDocumentPickerViewController(forOpeningContentTypes: [.plainText], asCopy: true)
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.plainText], asCopy: true)
+        picker.delegate = self
+        picker.allowsMultipleSelection = false
+        return picker
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        guard let url = urls.first else {
+            return
+        }
+        onPickedDocument?(url)
     }
 }

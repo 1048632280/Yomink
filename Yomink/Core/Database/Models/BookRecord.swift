@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-struct BookRecord: Codable, FetchableRecord, PersistableRecord, Hashable {
+struct BookRecord: Codable, FetchableRecord, PersistableRecord, Hashable, Sendable {
     static let databaseTableName = "books"
 
     var id: UUID
@@ -12,5 +12,8 @@ struct BookRecord: Codable, FetchableRecord, PersistableRecord, Hashable {
     var fileSize: UInt64
     var importedAt: Date
     var lastReadAt: Date?
-}
 
+    var fileURL: URL {
+        URL(fileURLWithPath: filePath)
+    }
+}

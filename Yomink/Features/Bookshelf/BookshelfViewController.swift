@@ -6,6 +6,9 @@ final class BookshelfViewController: UIViewController {
         case main
     }
 
+    var onImportRequested: (() -> Void)?
+    var onBookSelected: ((BookRecord) -> Void)?
+
     private let viewModel: BookshelfViewModel
     private var cancellables: Set<AnyCancellable> = []
     private var dataSource: UICollectionViewDiffableDataSource<Section, BookshelfViewModel.Item>?
@@ -44,6 +47,10 @@ final class BookshelfViewController: UIViewController {
         viewModel.refresh()
     }
 
+    func refreshBooks() {
+        viewModel.refresh()
+    }
+
     private func configureNavigationItems() {
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             image: UIImage(systemName: "folder"),
@@ -69,6 +76,7 @@ final class BookshelfViewController: UIViewController {
 
     private func configureCollectionView() {
         view.addSubview(collectionView)
+        collectionView.delegate = self
         NSLayoutConstraint.activate([
             collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -81,10 +89,16 @@ final class BookshelfViewController: UIViewController {
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, BookshelfViewModel.Item> { cell, _, item in
             var content = UIListContentConfiguration.cell()
             switch item {
+            case .book(let book):
+                content.text = book.title
+                content.secondaryText = Self.subtitle(for: book)
+                content.image = UIImage(systemName: "book.closed")
+                cell.accessories = [.disclosureIndicator()]
             case .emptyState:
                 content.text = "尚未导入书籍"
                 content.secondaryText = "从右上角添加 TXT 文件开始阅读"
-                content.image = UIImage(systemName: "book.closed")
+                content.image = UIImage(systemName: "tray")
+                cell.accessories = []
             }
             content.textProperties.color = primaryTextColor
             content.secondaryTextProperties.color = secondaryTextColor
@@ -120,16 +134,31 @@ final class BookshelfViewController: UIViewController {
     }
 
     @objc private func showImportOptions() {
-        presentPlaceholder(title: "导入", message: "文件导入将在阅读引擎 MVP 后接入。")
+        onImportRequested?()
     }
 
     @objc private func showSearch() {
-        presentPlaceholder(title: "搜索", message: "书名搜索和历史记录将在书架阶段接入。")
+        presentPlaceholder(title: "搜索", message: "书名搜索和历史记录将在后续阶段接入。")
     }
 
     private func presentPlaceholder(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "好", style: .default))
         present(alert, animated: true)
+    }
+
+    private static func subtitle(for book: BookRecord) -> String {
+        let size = ByteCountFormatter.string(fromByteCount: Int64(book.fileSize), countStyle: .file)
+        return "\(size) · \(book.encoding.rawValue)"
+    }
+}
+extension BookshelfViewController: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        guard let item = dataSource?.itemIdentifier(for: indexPath),
+              case .book(let book) = item else {
+            return
+        }
+        onBookSelected?(book)
     }
 }
