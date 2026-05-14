@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 final class AppCoordinator {
     private let window: UIWindow
     private let environment: AppEnvironment
@@ -27,4 +28,3 @@ final class AppCoordinator {
         environment.readingProgressStore.flushPendingProgress()
     }
 }
-

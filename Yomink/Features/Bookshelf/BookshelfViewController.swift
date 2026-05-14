@@ -11,15 +11,16 @@ final class BookshelfViewController: UIViewController {
     private var dataSource: UICollectionViewDiffableDataSource<Section, BookshelfViewModel.Item>?
 
     private lazy var collectionView: UICollectionView = {
+        let backgroundColor = YominkTheme.background
         let layout = UICollectionViewCompositionalLayout { _, layoutEnvironment in
             var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
-            configuration.backgroundColor = YominkTheme.background
+            configuration.backgroundColor = backgroundColor
             configuration.showsSeparators = false
             return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: layoutEnvironment)
         }
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.backgroundColor = YominkTheme.background
+        collectionView.backgroundColor = backgroundColor
         return collectionView
     }()
 
@@ -75,6 +76,8 @@ final class BookshelfViewController: UIViewController {
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
+        let primaryTextColor = YominkTheme.primaryText
+        let secondaryTextColor = YominkTheme.secondaryText
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, BookshelfViewModel.Item> { cell, _, item in
             var content = UIListContentConfiguration.cell()
             switch item {
@@ -83,8 +86,8 @@ final class BookshelfViewController: UIViewController {
                 content.secondaryText = "从右上角添加 TXT 文件开始阅读"
                 content.image = UIImage(systemName: "book.closed")
             }
-            content.textProperties.color = YominkTheme.primaryText
-            content.secondaryTextProperties.color = YominkTheme.secondaryText
+            content.textProperties.color = primaryTextColor
+            content.secondaryTextProperties.color = secondaryTextColor
             cell.contentConfiguration = content
             cell.backgroundConfiguration = UIBackgroundConfiguration.clear()
         }
@@ -130,4 +133,3 @@ final class BookshelfViewController: UIViewController {
         present(alert, animated: true)
     }
 }
-

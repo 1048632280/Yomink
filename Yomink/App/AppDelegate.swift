@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(
@@ -17,4 +18,3 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
 }
-

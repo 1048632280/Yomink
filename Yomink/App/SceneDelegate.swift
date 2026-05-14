@@ -1,5 +1,6 @@
 import UIKit
 
+@MainActor
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
     private var coordinator: AppCoordinator?
@@ -25,4 +26,3 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         coordinator?.saveApplicationState()
     }
 }
-
