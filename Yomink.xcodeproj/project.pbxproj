@@ -52,6 +52,8 @@
 		200000432000004320000043 /* ReaderPageRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000461000004610000046 /* ReaderPageRequest.swift */; };
 		200000442000004420000044 /* ReaderPagingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000471000004710000047 /* ReaderPagingService.swift */; };
 		200000452000004520000045 /* ReaderPagingServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000481000004810000048 /* ReaderPagingServiceTests.swift */; };
+		200000462000004620000046 /* ReaderSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000491000004910000049 /* ReaderSessionState.swift */; };
+		200000472000004720000047 /* ReaderStatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000501000005010000050 /* ReaderStatusBarView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -113,6 +115,8 @@
 		100000461000004610000046 /* ReaderPageRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderPageRequest.swift"; sourceTree = "<group>"; };
 		100000471000004710000047 /* ReaderPagingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Opening/ReaderPagingService.swift"; sourceTree = "<group>"; };
 		100000481000004810000048 /* ReaderPagingServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ReaderPagingServiceTests.swift"; sourceTree = "<group>"; };
+		100000491000004910000049 /* ReaderSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReaderSessionState.swift"; sourceTree = "<group>"; };
+		100000501000005010000050 /* ReaderStatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/ReaderStatusBarView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -181,6 +185,7 @@
 				100000471000004710000047 /* ReaderPagingService.swift */,
 				100000171000001710000017 /* ReadingProgress.swift */,
 				100000181000001810000018 /* ReadingProgressStore.swift */,
+				100000491000004910000049 /* ReaderSessionState.swift */,
 				100000191000001910000019 /* TextWindow.swift */,
 				100000201000002010000020 /* SearchIndexService.swift */,
 				100000211000002110000021 /* AppSettingsStore.swift */,
@@ -191,6 +196,7 @@
 				100000251000002510000025 /* ImportCoordinator.swift */,
 				100000261000002610000026 /* ReaderViewController.swift */,
 				100000421000004210000042 /* ReaderPageCell.swift */,
+				100000501000005010000050 /* ReaderStatusBarView.swift */,
 				100000271000002710000027 /* PlaceholderView.swift */,
 				100000281000002810000028 /* YominkTheme.swift */,
 				100000291000002910000029 /* Assets.xcassets */,
@@ -342,6 +348,7 @@
 				200000442000004420000044 /* ReaderPagingService.swift in Sources */,
 				200000172000001720000017 /* ReadingProgress.swift in Sources */,
 				200000182000001820000018 /* ReadingProgressStore.swift in Sources */,
+				200000462000004620000046 /* ReaderSessionState.swift in Sources */,
 				200000192000001920000019 /* TextWindow.swift in Sources */,
 				200000202000002020000020 /* SearchIndexService.swift in Sources */,
 				200000212000002120000021 /* AppSettingsStore.swift in Sources */,
@@ -352,6 +359,7 @@
 				200000252000002520000025 /* ImportCoordinator.swift in Sources */,
 				200000262000002620000026 /* ReaderViewController.swift in Sources */,
 				200000392000003920000039 /* ReaderPageCell.swift in Sources */,
+				200000472000004720000047 /* ReaderStatusBarView.swift in Sources */,
 				200000272000002720000027 /* PlaceholderView.swift in Sources */,
 				200000282000002820000028 /* YominkTheme.swift in Sources */,
 			);

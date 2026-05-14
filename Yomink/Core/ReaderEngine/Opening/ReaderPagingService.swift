@@ -15,6 +15,10 @@ final class ReaderPagingService: @unchecked Sendable {
         self.pageCache = pageCache
     }
 
+    func removeCachedPages() {
+        pageCache.removeAll()
+    }
+
     func page(_ request: ReaderPageRequest) async throws -> ReaderPage? {
         let key = cacheKey(for: request)
         if let cachedPage = pageCache.readerPage(for: key) {
@@ -93,4 +97,3 @@ private extension String {
         return String(self[..<endIndex])
     }
 }
-

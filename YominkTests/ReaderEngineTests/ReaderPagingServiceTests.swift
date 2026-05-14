@@ -63,6 +63,11 @@ final class ReaderPagingServiceTests: XCTestCase {
 
         XCTAssertEqual(cache.readerPage(for: "page-key"), page)
         XCTAssertEqual(cache.page(for: "page-key")?.byteRange, UInt64(128)..<UInt64(256))
+
+        cache.removeAll()
+
+        XCTAssertNil(cache.readerPage(for: "page-key"))
+        XCTAssertNil(cache.page(for: "page-key"))
     }
 
     private func makeTemporaryTextFile(text: String) throws -> URL {

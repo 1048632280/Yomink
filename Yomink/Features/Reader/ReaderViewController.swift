@@ -11,6 +11,7 @@ final class ReaderViewController: UIViewController {
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
+    private let statusBarView = ReaderStatusBarView()
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, ReaderPage>?
     private var pages: [ReaderPage] = []
@@ -20,6 +21,7 @@ final class ReaderViewController: UIViewController {
     private var didStartOpening = false
     private var didReachEndOfBook = false
     private var activeLayout = ReadingSettings.standard.layout
+    private let maximumResidentPages = 12
 
     init(
         book: BookRecord,
@@ -52,6 +54,7 @@ final class ReaderViewController: UIViewController {
         title = book.title
         view.backgroundColor = YominkTheme.background
         configureCollectionView()
+        configureStatusBar()
         configureDataSource()
         NotificationCenter.default.addObserver(
             self,
@@ -59,6 +62,12 @@ final class ReaderViewController: UIViewController {
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
+    }
+
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        pagingService.removeCachedPages()
+        trimResidentPagesAroundCurrent()
     }
 
     override func viewDidLayoutSubviews() {
@@ -93,6 +102,17 @@ final class ReaderViewController: UIViewController {
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+
+    private func configureStatusBar() {
+        statusBarView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(statusBarView)
+        NSLayoutConstraint.activate([
+            statusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            statusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            statusBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            statusBarView.heightAnchor.constraint(equalToConstant: 28)
         ])
     }
 
@@ -150,6 +170,7 @@ final class ReaderViewController: UIViewController {
         pages = [page]
         currentPage = page
         applyPagesSnapshot()
+        updateSessionState(isLoadingNextPage: false)
     }
 
     private func appendPage(_ page: ReaderPage) {
@@ -157,7 +178,10 @@ final class ReaderViewController: UIViewController {
             return
         }
         pages.append(page)
+        let removedPrefixCount = trimResidentPagesIfNeeded()
         applyPagesSnapshot()
+        adjustContentOffsetAfterRemovingPrefix(removedPrefixCount)
+        updateSessionState(isLoadingNextPage: false)
     }
 
     private func applyPagesSnapshot() {
@@ -187,16 +211,19 @@ final class ReaderViewController: UIViewController {
                 return
             }
 
+            updateSessionState(isLoadingNextPage: true)
             do {
                 let nextPage = try await pagingService.page(request)
                 nextPageTask = nil
                 guard let nextPage else {
                     didReachEndOfBook = true
+                    updateSessionState(isLoadingNextPage: false)
                     return
                 }
                 appendPage(nextPage)
             } catch {
                 nextPageTask = nil
+                updateSessionState(isLoadingNextPage: false)
             }
         }
     }
@@ -236,11 +263,86 @@ final class ReaderViewController: UIViewController {
         }
 
         currentPage = pages[indexPath.item]
+        updateSessionState(isLoadingNextPage: nextPageTask != nil)
+    }
+
+    private func trimResidentPagesIfNeeded() -> Int {
+        guard pages.count > maximumResidentPages,
+              let currentPage,
+              let currentIndex = pages.firstIndex(of: currentPage),
+              currentIndex > 3 else {
+            return 0
+        }
+
+        let overflow = pages.count - maximumResidentPages
+        let removableBeforeCurrent = max(0, currentIndex - 3)
+        let removeCount = min(overflow, removableBeforeCurrent)
+        guard removeCount > 0 else {
+            return 0
+        }
+
+        pages.removeFirst(removeCount)
+        return removeCount
+    }
+
+    private func trimResidentPagesAroundCurrent() {
+        updateCurrentPageFromVisiblePage()
+        guard let currentPage,
+              let currentIndex = pages.firstIndex(of: currentPage) else {
+            return
+        }
+
+        let lowerBound = max(0, currentIndex - 1)
+        let upperBound = min(pages.count, currentIndex + 2)
+        let removePrefixCount = lowerBound
+        pages = Array(pages[lowerBound..<upperBound])
+        applyPagesSnapshot()
+        adjustContentOffsetAfterRemovingPrefix(removePrefixCount)
+        updateSessionState(isLoadingNextPage: nextPageTask != nil)
+    }
+
+    private func adjustContentOffsetAfterRemovingPrefix(_ removePrefixCount: Int) {
+        guard removePrefixCount > 0 else {
+            return
+        }
+        let pageWidth = collectionView.bounds.width
+        guard pageWidth > 0 else {
+            return
+        }
+
+        let adjustedOffset = CGPoint(
+            x: max(0, collectionView.contentOffset.x - CGFloat(removePrefixCount) * pageWidth),
+            y: collectionView.contentOffset.y
+        )
+        collectionView.setContentOffset(adjustedOffset, animated: false)
+    }
+
+    private func updateSessionState(isLoadingNextPage: Bool) {
+        guard let currentPage else {
+            return
+        }
+
+        statusBarView.configure(
+            state: ReaderSessionState(
+                bookID: currentPage.bookID,
+                currentPageIndex: currentPage.pageIndex,
+                residentPageCount: pages.count,
+                startByteOffset: currentPage.startByteOffset,
+                endByteOffset: currentPage.endByteOffset,
+                fileSize: book.fileSize,
+                isLoadingNextPage: isLoadingNextPage,
+                didReachEndOfBook: didReachEndOfBook
+            )
+        )
     }
 
     private func showOpeningError() {
-        let alert = UIAlertController(title: "打开失败", message: "无法打开这本 TXT。", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "好", style: .default))
+        let alert = UIAlertController(
+            title: "\u{6253}\u{5F00}\u{5931}\u{8D25}",
+            message: "\u{65E0}\u{6CD5}\u{6253}\u{5F00}\u{8FD9}\u{672C} TXT\u{3002}",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "\u{597D}", style: .default))
         present(alert, animated: true)
     }
 }
@@ -252,6 +354,7 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         }
 
         currentPage = pages[indexPath.item]
+        updateSessionState(isLoadingNextPage: nextPageTask != nil)
         if indexPath.item >= pages.count - 2 {
             loadNextPageIfNeeded()
         }
