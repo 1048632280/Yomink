@@ -38,8 +38,6 @@ final class ReaderViewController: UIViewController {
     private var isCurrentPageBookmarked = false
     private var shouldScrollToPreviousPageAfterLoad = false
     private var shouldScrollToNextPageAfterLoad = false
-    private var isTapPageTurnInProgress = false
-    private var isTapPageTurnAwaitingLoadedPage = false
     private var didStartOpening = false
     private var didReachEndOfBook = false
     private var isLoadingNextPage = false
@@ -287,7 +285,7 @@ final class ReaderViewController: UIViewController {
         collectionView.backgroundColor = palette.background
         statusBarView.applyTheme(theme)
         autoReadPanelView.configure(speed: autoReadSpeed, theme: theme)
-        chromeView.configure(title: book.title, state: currentSessionState(), theme: theme)
+        configureChromeView()
     }
 
     @objc private func showReadingSettings() {
@@ -750,13 +748,19 @@ final class ReaderViewController: UIViewController {
     }
 
     private func updateChrome() {
+        configureChromeView()
+        chromeView.setBookmarkActive(isCurrentPageBookmarked)
+        updateStatusBar()
+    }
+
+    private func configureChromeView() {
         chromeView.configure(
             title: book.title,
             state: currentSessionState(),
-            theme: activeSettings.theme
+            theme: activeSettings.theme,
+            progressValue: currentChapterProgressValue(),
+            progressText: currentChapterProgressText()
         )
-        chromeView.setBookmarkActive(isCurrentPageBookmarked)
-        updateStatusBar()
     }
 
     private func refreshBookmarkState(force: Bool = false) {
@@ -840,23 +844,100 @@ final class ReaderViewController: UIViewController {
         )
     }
 
+    private func currentChapterProgressValue() -> Float? {
+        guard let currentPage else {
+            return nil
+        }
+        return chapterRange(containing: currentPage.startByteOffset)
+            .progress(for: currentPage.startByteOffset)
+    }
+
+    private func currentChapterProgressText() -> String? {
+        guard let currentPage else {
+            return nil
+        }
+        let range = chapterRange(containing: currentPage.startByteOffset)
+        return chapterProgressText(
+            title: range.title,
+            progress: range.progress(for: currentPage.startByteOffset)
+        )
+    }
+
     private func progressPreviewText(for progress: Float) -> String {
         let clampedProgress = min(1, max(0, Double(progress)))
-        let byteOffset = UInt64(clampedProgress * Double(book.fileSize))
-        let percentText = NumberFormatter.localizedString(
-            from: NSNumber(value: clampedProgress),
-            number: .percent
-        )
-        guard let chapter = nearestChapter(atOrBefore: byteOffset) else {
-            return percentText
-        }
-        return "\(chapter.title) \(percentText)"
+        let range = chapterRangeForCurrentPage()
+        return chapterProgressText(title: range.title, progress: Float(clampedProgress))
     }
 
     private func jumpToProgress(_ progress: Float) {
         let clampedProgress = min(1, max(0, Double(progress)))
-        let byteOffset = min(book.fileSize.lastReadableByteOffset, UInt64(clampedProgress * Double(book.fileSize)))
+        let range = chapterRangeForCurrentPage()
+        let byteOffset = range.byteOffset(for: clampedProgress)
         jumpToByteOffset(byteOffset)
+    }
+
+    private func chapterProgressText(title: String?, progress: Float) -> String {
+        let clampedProgress = min(Float(1), max(Float(0), progress))
+        let percentText = NumberFormatter.localizedString(
+            from: NSNumber(value: clampedProgress),
+            number: .percent
+        )
+        return "\(title ?? "\u{672C}\u{7AE0}") \(percentText)"
+    }
+
+    private func chapterRangeForCurrentPage() -> ChapterByteRange {
+        updateCurrentPageFromVisiblePage()
+        return chapterRange(containing: currentPage?.startByteOffset ?? 0)
+    }
+
+    private func chapterRange(containing byteOffset: UInt64) -> ChapterByteRange {
+        let fileEnd = max(UInt64(1), book.fileSize)
+        let readableByteOffset = min(byteOffset, fileEnd - 1)
+        guard !chapters.isEmpty else {
+            return ChapterByteRange(title: nil, startByteOffset: 0, endByteOffset: fileEnd)
+        }
+
+        if let index = chapters.lastIndex(where: { $0.byteOffset <= readableByteOffset }) {
+            let chapter = chapters[index]
+            let rawEndByteOffset = chapters.indices.contains(index + 1)
+                ? chapters[index + 1].byteOffset
+                : fileEnd
+            return ChapterByteRange(
+                title: chapter.title,
+                startByteOffset: min(chapter.byteOffset, fileEnd - 1),
+                endByteOffset: min(fileEnd, rawEndByteOffset)
+            )
+        }
+
+        let firstChapterStart = min(chapters[0].byteOffset, fileEnd)
+        return ChapterByteRange(
+            title: nil,
+            startByteOffset: 0,
+            endByteOffset: max(UInt64(1), firstChapterStart)
+        )
+    }
+
+    private func chapterUpperBoundForPage(startingAt byteOffset: UInt64) -> UInt64? {
+        guard !chapters.isEmpty else {
+            return nil
+        }
+        return chapterRange(containing: byteOffset).endByteOffset
+    }
+
+    private func chapterLowerBoundForPreviousPage(endingAt byteOffset: UInt64) -> UInt64? {
+        guard !chapters.isEmpty,
+              byteOffset > 0 else {
+            return nil
+        }
+
+        if let exactChapterIndex = chapters.firstIndex(where: { $0.byteOffset == byteOffset }) {
+            guard exactChapterIndex > 0 else {
+                return 0
+            }
+            return chapters[exactChapterIndex - 1].byteOffset
+        }
+
+        return chapterRange(containing: byteOffset - 1).startByteOffset
     }
 
     private func jumpToAdjacentChapter(direction: Int) {
@@ -927,14 +1008,33 @@ final class ReaderViewController: UIViewController {
                 return
             }
 
+            var shouldReflowForChapterBoundaries = false
             do {
-                chapters = try await chapterService.chapters(bookID: book.id)
+                let loadedChapters = try await chapterService.chapters(bookID: book.id)
+                shouldReflowForChapterBoundaries = !loadedChapters.isEmpty
+                    && loadedChapters != chapters
+                    && currentPage != nil
+                chapters = loadedChapters
             } catch {
                 chapters = []
             }
             chapterRefreshTask = nil
             updateChrome()
+            if shouldReflowForChapterBoundaries {
+                reflowCurrentPageForChapterBoundaries()
+            }
         }
+    }
+
+    private func reflowCurrentPageForChapterBoundaries() {
+        guard !isAutoReading else {
+            return
+        }
+
+        updateCurrentPageFromVisiblePage()
+        let preferredByteOffset = currentPage?.startByteOffset
+        pagingService.removeCachedPages()
+        openPage(preferredByteOffset: preferredByteOffset)
     }
 
     private func showMoreMenu() {
@@ -1289,7 +1389,6 @@ final class ReaderViewController: UIViewController {
         nextPageTask = nil
         shouldScrollToPreviousPageAfterLoad = false
         shouldScrollToNextPageAfterLoad = false
-        clearTapPageTurnState()
         isLoadingNextPage = false
         pages = []
         currentPage = nil
@@ -1298,11 +1397,13 @@ final class ReaderViewController: UIViewController {
         didReachEndOfBook = false
         pagingGeneration += 1
         let generation = pagingGeneration
+        let requestStartByteOffset = preferredByteOffset ?? currentPage?.startByteOffset ?? 0
         let request = ReaderOpeningRequest(
             bookID: book.id,
             viewportSize: collectionView.bounds.size,
             layout: effectiveReadingLayout(from: activeSettings.layout),
-            preferredByteOffset: preferredByteOffset
+            preferredByteOffset: preferredByteOffset,
+            upperBoundByteOffset: chapterUpperBoundForPage(startingAt: requestStartByteOffset)
         )
 
         openingTask = Task { [weak self] in
@@ -1403,9 +1504,6 @@ final class ReaderViewController: UIViewController {
               let lastPage = pages.last,
               lastPage.endByteOffset < book.fileSize else {
             shouldScrollToNextPageAfterLoad = false
-            if scrollAfterLoading {
-                clearTapPageTurnState()
-            }
             return
         }
         guard nextPageTask == nil else {
@@ -1416,7 +1514,8 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             startByteOffset: lastPage.endByteOffset,
             pageIndex: lastPage.pageIndex + 1,
-            layout: effectiveReadingLayout(from: activeSettings.layout)
+            layout: effectiveReadingLayout(from: activeSettings.layout),
+            upperBoundByteOffset: chapterUpperBoundForPage(startingAt: lastPage.endByteOffset)
         )
         let generation = pagingGeneration
 
@@ -1434,37 +1533,22 @@ final class ReaderViewController: UIViewController {
                 nextPageTask = nil
                 guard let nextPage else {
                     didReachEndOfBook = true
-                    let shouldScroll = shouldScrollToNextPageAfterLoad
                     shouldScrollToNextPageAfterLoad = false
-                    if shouldScroll {
-                        clearTapPageTurnState()
-                    }
                     updateSessionState(isLoadingNextPage: false)
                     return
                 }
                 let shouldScroll = shouldScrollToNextPageAfterLoad
                 shouldScrollToNextPageAfterLoad = false
-                if (isTapPageTurnInProgress || isTapPageTurnAwaitingLoadedPage) && !shouldScroll {
-                    updateSessionState(isLoadingNextPage: false)
-                    return
-                }
                 if let index = appendPage(nextPage),
                    shouldScroll {
-                    isTapPageTurnAwaitingLoadedPage = false
-                    scrollToPage(at: index, animated: true)
-                } else if shouldScroll {
-                    clearTapPageTurnState()
+                    scrollToPage(at: index, animated: false)
                 }
             } catch {
                 guard pagingGeneration == generation else {
                     return
                 }
                 nextPageTask = nil
-                let shouldScroll = shouldScrollToNextPageAfterLoad
                 shouldScrollToNextPageAfterLoad = false
-                if shouldScroll {
-                    clearTapPageTurnState()
-                }
                 updateSessionState(isLoadingNextPage: false)
             }
         }
@@ -1477,9 +1561,6 @@ final class ReaderViewController: UIViewController {
         guard let firstPage = pages.first,
               firstPage.startByteOffset > 0 else {
             shouldScrollToPreviousPageAfterLoad = false
-            if scrollAfterLoading {
-                clearTapPageTurnState()
-            }
             return
         }
         guard previousPageTask == nil else {
@@ -1490,7 +1571,8 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             endByteOffset: firstPage.startByteOffset,
             pageIndex: max(0, firstPage.pageIndex - 1),
-            layout: effectiveReadingLayout(from: activeSettings.layout)
+            layout: effectiveReadingLayout(from: activeSettings.layout),
+            lowerBoundByteOffset: chapterLowerBoundForPreviousPage(endingAt: firstPage.startByteOffset)
         )
         let generation = pagingGeneration
 
@@ -1506,36 +1588,21 @@ final class ReaderViewController: UIViewController {
                 }
                 previousPageTask = nil
                 guard let previousPage else {
-                    let shouldScroll = shouldScrollToPreviousPageAfterLoad
                     shouldScrollToPreviousPageAfterLoad = false
-                    if shouldScroll {
-                        clearTapPageTurnState()
-                    }
                     return
                 }
                 let shouldScroll = shouldScrollToPreviousPageAfterLoad
                 shouldScrollToPreviousPageAfterLoad = false
-                if (isTapPageTurnInProgress || isTapPageTurnAwaitingLoadedPage) && !shouldScroll {
-                    updateSessionState(isLoadingNextPage: nextPageTask != nil)
-                    return
-                }
                 if let index = prependPage(previousPage),
                    shouldScroll {
-                    isTapPageTurnAwaitingLoadedPage = false
-                    scrollToPage(at: index, animated: true)
-                } else if shouldScroll {
-                    clearTapPageTurnState()
+                    scrollToPage(at: index, animated: false)
                 }
             } catch {
                 guard pagingGeneration == generation else {
                     return
                 }
                 previousPageTask = nil
-                let shouldScroll = shouldScrollToPreviousPageAfterLoad
                 shouldScrollToPreviousPageAfterLoad = false
-                if shouldScroll {
-                    clearTapPageTurnState()
-                }
             }
         }
     }
@@ -1741,56 +1808,41 @@ final class ReaderViewController: UIViewController {
     }
 
     private func pageForwardFromTap() {
-        guard beginTapPageTurnIfPossible() else {
+        guard snapToNearestPageIfNeeded(),
+              openingTask == nil else {
             return
         }
         pauseBackgroundWork()
         guard let currentPage,
               let currentIndex = pages.firstIndex(of: currentPage) else {
-            clearTapPageTurnState()
             return
         }
 
         let nextIndex = currentIndex + 1
         if pages.indices.contains(nextIndex) {
-            scrollToPage(at: nextIndex, animated: true)
+            scrollToPage(at: nextIndex, animated: false)
         } else {
-            isTapPageTurnAwaitingLoadedPage = true
             loadNextPageIfNeeded(scrollAfterLoading: true)
         }
     }
 
     private func pageBackwardFromTap() {
-        guard beginTapPageTurnIfPossible() else {
+        guard snapToNearestPageIfNeeded(),
+              openingTask == nil else {
             return
         }
         pauseBackgroundWork()
         guard let currentPage,
               let currentIndex = pages.firstIndex(of: currentPage) else {
-            clearTapPageTurnState()
             return
         }
 
         let previousIndex = currentIndex - 1
         if pages.indices.contains(previousIndex) {
-            scrollToPage(at: previousIndex, animated: true)
+            scrollToPage(at: previousIndex, animated: false)
         } else {
-            isTapPageTurnAwaitingLoadedPage = true
             loadPreviousPageIfNeeded(scrollAfterLoading: true)
         }
-    }
-
-    private func beginTapPageTurnIfPossible() -> Bool {
-        guard !isTapPageTurnInProgress,
-              !isTapPageTurnAwaitingLoadedPage,
-              openingTask == nil,
-              !collectionView.isDragging,
-              !collectionView.isDecelerating,
-              !collectionView.isTracking else {
-            return false
-        }
-
-        return snapToNearestPageIfNeeded()
     }
 
     @discardableResult
@@ -1820,14 +1872,8 @@ final class ReaderViewController: UIViewController {
         return CGPoint(x: CGFloat(index) * collectionView.bounds.width, y: 0)
     }
 
-    private func clearTapPageTurnState() {
-        isTapPageTurnInProgress = false
-        isTapPageTurnAwaitingLoadedPage = false
-    }
-
     private func scrollToPage(at index: Int, animated: Bool) {
         guard pages.indices.contains(index) else {
-            clearTapPageTurnState()
             return
         }
 
@@ -1843,9 +1889,6 @@ final class ReaderViewController: UIViewController {
             return
         }
 
-        if animated {
-            isTapPageTurnInProgress = true
-        }
         collectionView.setContentOffset(targetOffset, animated: animated)
         currentPage = pages[index]
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
@@ -1855,7 +1898,6 @@ final class ReaderViewController: UIViewController {
     }
 
     private func finishPageTurn() {
-        clearTapPageTurnState()
         if usesVerticalScrolling {
             updateCurrentPageFromVisiblePage()
         } else {
@@ -1916,7 +1958,6 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        clearTapPageTurnState()
         shouldScrollToPreviousPageAfterLoad = false
         shouldScrollToNextPageAfterLoad = false
         pauseBackgroundWork()
@@ -1963,8 +2004,28 @@ private struct ReaderViewportMetrics: Equatable {
     }
 }
 
-private extension UInt64 {
-    var lastReadableByteOffset: UInt64 {
-        self > 0 ? self - 1 : 0
+private struct ChapterByteRange {
+    let title: String?
+    let startByteOffset: UInt64
+    let endByteOffset: UInt64
+
+    init(title: String?, startByteOffset: UInt64, endByteOffset: UInt64) {
+        self.title = title
+        self.startByteOffset = startByteOffset
+        self.endByteOffset = max(startByteOffset + 1, endByteOffset)
+    }
+
+    func progress(for byteOffset: UInt64) -> Float {
+        let clampedByteOffset = min(max(byteOffset, startByteOffset), endByteOffset)
+        let completedByteCount = clampedByteOffset - startByteOffset
+        let totalByteCount = max(UInt64(1), endByteOffset - startByteOffset)
+        return Float(Double(completedByteCount) / Double(totalByteCount))
+    }
+
+    func byteOffset(for progress: Double) -> UInt64 {
+        let clampedProgress = min(1, max(0, progress))
+        let totalByteCount = max(UInt64(1), endByteOffset - startByteOffset)
+        let offset = startByteOffset + UInt64(clampedProgress * Double(totalByteCount))
+        return min(endByteOffset - 1, offset)
     }
 }

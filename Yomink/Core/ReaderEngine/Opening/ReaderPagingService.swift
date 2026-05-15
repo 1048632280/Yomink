@@ -36,11 +36,17 @@ final class ReaderPagingService: @unchecked Sendable {
             }
 
             let mapping = try BookFileMapping(fileURL: book.fileURL)
+            let requestedUpperBound = request.upperBoundByteOffset.map {
+                min(mapping.fileSize, max(request.startByteOffset + 1, $0))
+            } ?? mapping.fileSize
             let page = try Self.makePage(
                 book: book,
                 mapping: mapping,
                 startByteOffset: request.startByteOffset,
-                upperBound: min(mapping.fileSize, request.startByteOffset + BookFileMapping.maximumWindowLength),
+                upperBound: min(
+                    requestedUpperBound,
+                    request.startByteOffset + BookFileMapping.maximumWindowLength
+                ),
                 pageIndex: request.pageIndex,
                 layout: request.layout
             )
@@ -67,9 +73,11 @@ final class ReaderPagingService: @unchecked Sendable {
                 return nil
             }
 
+            let lowerSearchLimit = min(request.lowerBoundByteOffset ?? 0, targetEndByteOffset - 1)
             var lowerBound = targetEndByteOffset > Self.previousPageSearchLength
                 ? targetEndByteOffset - Self.previousPageSearchLength
                 : 0
+            lowerBound = max(lowerBound, lowerSearchLimit)
             var upperBound = targetEndByteOffset - 1
             var candidatePage: ReaderPage?
 
@@ -133,7 +141,8 @@ final class ReaderPagingService: @unchecked Sendable {
             "\(request.layout.contentInsets.top)",
             "\(request.layout.contentInsets.left)",
             "\(request.layout.contentInsets.bottom)",
-            "\(request.layout.contentInsets.right)"
+            "\(request.layout.contentInsets.right)",
+            "\(request.upperBoundByteOffset ?? 0)"
         ].joined(separator: ":")
     }
 
@@ -151,7 +160,8 @@ final class ReaderPagingService: @unchecked Sendable {
             "\(request.layout.contentInsets.top)",
             "\(request.layout.contentInsets.left)",
             "\(request.layout.contentInsets.bottom)",
-            "\(request.layout.contentInsets.right)"
+            "\(request.layout.contentInsets.right)",
+            "\(request.lowerBoundByteOffset ?? 0)"
         ].joined(separator: ":")
     }
 

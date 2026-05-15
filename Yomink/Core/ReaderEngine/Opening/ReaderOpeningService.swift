@@ -31,8 +31,11 @@ final class ReaderOpeningService: @unchecked Sendable {
 
             let mapping = try BookFileMapping(fileURL: book.fileURL)
             let clampedStart = min(startByteOffset, mapping.fileSize - 1)
+            let requestedUpperBound = request.upperBoundByteOffset.map {
+                min(mapping.fileSize, max(clampedStart + 1, $0))
+            } ?? mapping.fileSize
             let upperBound = min(
-                mapping.fileSize,
+                requestedUpperBound,
                 clampedStart + BookFileMapping.maximumWindowLength
             )
             let windowData = try mapping.bytes(in: clampedStart..<upperBound)

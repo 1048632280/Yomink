@@ -5,6 +5,7 @@ struct ReaderPageRequest: Hashable, Sendable {
     let startByteOffset: UInt64
     let pageIndex: Int
     let layout: ReadingLayout
+    let upperBoundByteOffset: UInt64?
 }
 
 struct ReaderPreviousPageRequest: Hashable, Sendable {
@@ -12,4 +13,5 @@ struct ReaderPreviousPageRequest: Hashable, Sendable {
     let endByteOffset: UInt64
     let pageIndex: Int
     let layout: ReadingLayout
+    let lowerBoundByteOffset: UInt64?
 }

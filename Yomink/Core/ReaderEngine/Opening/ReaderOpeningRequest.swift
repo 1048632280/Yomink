@@ -6,12 +6,14 @@ struct ReaderOpeningRequest: Hashable, Sendable {
     let viewportSize: CGSize
     let layout: ReadingLayout
     let preferredByteOffset: UInt64?
+    let upperBoundByteOffset: UInt64?
 
     init(
         bookID: UUID,
         viewportSize: CGSize,
         layout: ReadingLayout,
-        preferredByteOffset: UInt64?
+        preferredByteOffset: UInt64?,
+        upperBoundByteOffset: UInt64? = nil
     ) {
         self.bookID = bookID
         self.viewportSize = viewportSize
@@ -19,6 +21,6 @@ struct ReaderOpeningRequest: Hashable, Sendable {
         resolvedLayout.viewportSize = viewportSize
         self.layout = resolvedLayout
         self.preferredByteOffset = preferredByteOffset
+        self.upperBoundByteOffset = upperBoundByteOffset
     }
 }
-

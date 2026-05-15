@@ -47,7 +47,13 @@ final class ReaderChromeView: UIView {
         nil
     }
 
-    func configure(title: String, state: ReaderSessionState?, theme: ReadingTheme) {
+    func configure(
+        title: String,
+        state: ReaderSessionState?,
+        theme: ReadingTheme,
+        progressValue: Float? = nil,
+        progressText: String? = nil
+    ) {
         titleLabel.text = title
         applyTheme(theme)
 
@@ -58,8 +64,8 @@ final class ReaderChromeView: UIView {
         }
 
         if !isDraggingProgress {
-            progressLabel.text = state.progressPercentText
-            progressSlider.value = Float(Double(state.startByteOffset) / Double(max(1, state.fileSize)))
+            progressLabel.text = progressText ?? state.progressPercentText
+            progressSlider.value = progressValue ?? Float(Double(state.startByteOffset) / Double(max(1, state.fileSize)))
         }
     }
 
