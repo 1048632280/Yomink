@@ -7,6 +7,8 @@ enum ReaderPagingError: Error {
 }
 
 final class ReaderPagingService: @unchecked Sendable {
+    private static let previousPageSearchLength = BookFileMapping.maximumWindowLength
+
     private let bookRepository: BookRepository
     private let pageCache: ReaderPageCache
 
@@ -34,37 +36,83 @@ final class ReaderPagingService: @unchecked Sendable {
             }
 
             let mapping = try BookFileMapping(fileURL: book.fileURL)
-            let clampedStart = min(request.startByteOffset, mapping.fileSize - 1)
-            let upperBound = min(
-                mapping.fileSize,
-                clampedStart + BookFileMapping.maximumWindowLength
-            )
-            let windowData = try mapping.bytes(in: clampedStart..<upperBound)
-            let decodedText = try TextDecoder().decodeWindow(data: windowData, encoding: book.encoding)
-            let textWindow = TextWindow(
-                byteRange: clampedStart..<upperBound,
-                text: decodedText.prefixUTF16Units(CoreTextPaginator.maximumUTF16Length)
-            )
-            let pagination = try CoreTextPaginator().paginatePageWithText(
-                window: textWindow,
-                layout: request.layout,
-                bookID: book.id,
+            let page = try Self.makePage(
+                book: book,
+                mapping: mapping,
+                startByteOffset: request.startByteOffset,
+                upperBound: min(mapping.fileSize, request.startByteOffset + BookFileMapping.maximumWindowLength),
                 pageIndex: request.pageIndex,
-                encoding: book.encoding
+                layout: request.layout
             )
 
-            guard !pagination.text.isEmpty else {
-                throw ReaderPagingError.emptyVisiblePage
+            pageCache.insert(page, for: key)
+            return page
+        }.value
+    }
+
+    func previousPage(_ request: ReaderPreviousPageRequest) async throws -> ReaderPage? {
+        let key = cacheKey(for: request)
+        if let cachedPage = pageCache.readerPage(for: key) {
+            return cachedPage
+        }
+
+        return try await Task.detached(priority: .userInitiated) { [bookRepository, pageCache] in
+            guard let book = try bookRepository.fetchBook(id: request.bookID) else {
+                throw ReaderPagingError.bookNotFound
             }
-            guard pagination.pageByteRange.endByteOffset > pagination.pageByteRange.startByteOffset else {
-                throw ReaderPagingError.stalledPageBoundary
+
+            let mapping = try BookFileMapping(fileURL: book.fileURL)
+            let targetEndByteOffset = min(request.endByteOffset, mapping.fileSize)
+            guard targetEndByteOffset > 0 else {
+                return nil
+            }
+
+            var lowerBound = targetEndByteOffset > Self.previousPageSearchLength
+                ? targetEndByteOffset - Self.previousPageSearchLength
+                : 0
+            var upperBound = targetEndByteOffset - 1
+            var candidatePage: ReaderPage?
+
+            // Reverse paging is anchored at the current page start. A bounded binary search finds the earliest
+            // byte offset whose text still fits in one page, avoiding global pagination after chapter/progress jumps.
+            while lowerBound <= upperBound {
+                let midpoint = lowerBound + (upperBound - lowerBound) / 2
+                guard let page = try Self.makePageIfReadable(
+                    book: book,
+                    mapping: mapping,
+                    startByteOffset: midpoint,
+                    upperBound: targetEndByteOffset,
+                    pageIndex: request.pageIndex,
+                    layout: request.layout
+                ) else {
+                    if midpoint == 0 {
+                        break
+                    }
+                    upperBound = midpoint - 1
+                    continue
+                }
+
+                if page.endByteOffset >= targetEndByteOffset {
+                    candidatePage = page
+                    if midpoint == 0 {
+                        break
+                    }
+                    upperBound = midpoint - 1
+                } else {
+                    lowerBound = midpoint + 1
+                }
+            }
+
+            guard let candidatePage,
+                  candidatePage.startByteOffset < targetEndByteOffset else {
+                return nil
             }
 
             let page = ReaderPage(
-                bookID: book.id,
+                bookID: candidatePage.bookID,
                 pageIndex: request.pageIndex,
-                byteRange: pagination.pageByteRange.byteRange,
-                text: pagination.text
+                byteRange: candidatePage.startByteOffset..<targetEndByteOffset,
+                text: candidatePage.text
             )
             pageCache.insert(page, for: key)
             return page
@@ -73,6 +121,7 @@ final class ReaderPagingService: @unchecked Sendable {
 
     private func cacheKey(for request: ReaderPageRequest) -> String {
         [
+            "next",
             request.bookID.uuidString,
             "\(request.startByteOffset)",
             "\(request.pageIndex)",
@@ -82,6 +131,85 @@ final class ReaderPagingService: @unchecked Sendable {
             "\(request.layout.lineSpacing)",
             "\(request.layout.paragraphSpacing)"
         ].joined(separator: ":")
+    }
+
+    private func cacheKey(for request: ReaderPreviousPageRequest) -> String {
+        [
+            "previous",
+            request.bookID.uuidString,
+            "\(request.endByteOffset)",
+            "\(request.pageIndex)",
+            "\(Int(request.layout.viewportSize.width))x\(Int(request.layout.viewportSize.height))",
+            request.layout.fontName,
+            "\(request.layout.fontSize)",
+            "\(request.layout.lineSpacing)",
+            "\(request.layout.paragraphSpacing)"
+        ].joined(separator: ":")
+    }
+
+    private static func makePage(
+        book: BookRecord,
+        mapping: BookFileMapping,
+        startByteOffset: UInt64,
+        upperBound: UInt64,
+        pageIndex: Int,
+        layout: ReadingLayout
+    ) throws -> ReaderPage {
+        let clampedStart = min(startByteOffset, mapping.fileSize - 1)
+        let clampedUpperBound = min(mapping.fileSize, max(clampedStart + 1, upperBound))
+        let windowData = try mapping.bytes(in: clampedStart..<clampedUpperBound)
+        let decodedWindow = try TextDecoder().decodeBoundedWindow(data: windowData, encoding: book.encoding)
+        let windowStart = clampedStart + decodedWindow.trimmedPrefixByteCount
+        let windowEnd = clampedUpperBound - decodedWindow.trimmedSuffixByteCount
+        let textWindow = TextWindow(
+            byteRange: windowStart..<windowEnd,
+            text: decodedWindow.text.prefixUTF16Units(CoreTextPaginator.maximumUTF16Length)
+        )
+        let pagination = try CoreTextPaginator().paginatePageWithText(
+            window: textWindow,
+            layout: layout,
+            bookID: book.id,
+            pageIndex: pageIndex,
+            encoding: book.encoding
+        )
+
+        guard !pagination.text.isEmpty else {
+            throw ReaderPagingError.emptyVisiblePage
+        }
+        guard pagination.pageByteRange.endByteOffset > pagination.pageByteRange.startByteOffset else {
+            throw ReaderPagingError.stalledPageBoundary
+        }
+
+        return ReaderPage(
+            bookID: book.id,
+            pageIndex: pageIndex,
+            byteRange: pagination.pageByteRange.byteRange,
+            text: pagination.text
+        )
+    }
+
+    private static func makePageIfReadable(
+        book: BookRecord,
+        mapping: BookFileMapping,
+        startByteOffset: UInt64,
+        upperBound: UInt64,
+        pageIndex: Int,
+        layout: ReadingLayout
+    ) throws -> ReaderPage? {
+        do {
+            return try makePage(
+                book: book,
+                mapping: mapping,
+                startByteOffset: startByteOffset,
+                upperBound: upperBound,
+                pageIndex: pageIndex,
+                layout: layout
+            )
+        } catch TextDecoderError.undecodableWindow {
+            return nil
+        } catch ReaderPagingError.emptyVisiblePage {
+            return nil
+        }
     }
 }
 

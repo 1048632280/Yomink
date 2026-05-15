@@ -36,10 +36,12 @@ final class ReaderOpeningService: @unchecked Sendable {
                 clampedStart + BookFileMapping.maximumWindowLength
             )
             let windowData = try mapping.bytes(in: clampedStart..<upperBound)
-            let decodedText = try TextDecoder().decodeWindow(data: windowData, encoding: book.encoding)
+            let decodedWindow = try TextDecoder().decodeBoundedWindow(data: windowData, encoding: book.encoding)
+            let windowStart = clampedStart + decodedWindow.trimmedPrefixByteCount
+            let windowEnd = upperBound - decodedWindow.trimmedSuffixByteCount
             let textWindow = TextWindow(
-                byteRange: clampedStart..<upperBound,
-                text: decodedText.prefixUTF16Units(CoreTextPaginator.maximumUTF16Length)
+                byteRange: windowStart..<windowEnd,
+                text: decodedWindow.text.prefixUTF16Units(CoreTextPaginator.maximumUTF16Length)
             )
             let pagination = try CoreTextPaginator().paginateFirstPageWithText(
                 window: textWindow,

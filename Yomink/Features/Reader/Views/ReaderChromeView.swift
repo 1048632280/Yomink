@@ -48,7 +48,7 @@ final class ReaderChromeView: UIView {
 
         if !isDraggingProgress {
             progressLabel.text = state.progressPercentText
-            progressSlider.value = Float(state.endByteOffset) / Float(max(1, state.fileSize))
+            progressSlider.value = Float(Double(state.startByteOffset) / Double(max(1, state.fileSize)))
         }
     }
 

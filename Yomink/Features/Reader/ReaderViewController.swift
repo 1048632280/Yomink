@@ -20,10 +20,12 @@ final class ReaderViewController: UIViewController {
     private var currentPage: ReaderPage?
     private var chapters: [ReadingChapter] = []
     private var openingTask: Task<Void, Never>?
+    private var previousPageTask: Task<Void, Never>?
     private var nextPageTask: Task<Void, Never>?
     private var chapterRefreshTask: Task<Void, Never>?
     private var didStartOpening = false
     private var didReachEndOfBook = false
+    private var isLoadingNextPage = false
     private var isChromeVisible = false
     private var activeSettings = ReadingSettings.standard
     private var pagingGeneration = 0
@@ -102,6 +104,7 @@ final class ReaderViewController: UIViewController {
 
     deinit {
         openingTask?.cancel()
+        previousPageTask?.cancel()
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
         chapterService.cancelParsing(bookID: book.id)
@@ -331,14 +334,14 @@ final class ReaderViewController: UIViewController {
             startByteOffset: currentPage.startByteOffset,
             endByteOffset: currentPage.endByteOffset,
             fileSize: book.fileSize,
-            isLoadingNextPage: nextPageTask != nil,
+            isLoadingNextPage: isLoadingNextPage,
             didReachEndOfBook: didReachEndOfBook
         )
     }
 
     private func progressPreviewText(for progress: Float) -> String {
-        let clampedProgress = min(1, max(0, progress))
-        let byteOffset = UInt64(clampedProgress * Float(book.fileSize))
+        let clampedProgress = min(1, max(0, Double(progress)))
+        let byteOffset = UInt64(clampedProgress * Double(book.fileSize))
         let percentText = NumberFormatter.localizedString(
             from: NSNumber(value: clampedProgress),
             number: .percent
@@ -350,8 +353,8 @@ final class ReaderViewController: UIViewController {
     }
 
     private func jumpToProgress(_ progress: Float) {
-        let clampedProgress = min(1, max(0, progress))
-        let byteOffset = min(book.fileSize.lastReadableByteOffset, UInt64(clampedProgress * Float(book.fileSize)))
+        let clampedProgress = min(1, max(0, Double(progress)))
+        let byteOffset = min(book.fileSize.lastReadableByteOffset, UInt64(clampedProgress * Double(book.fileSize)))
         jumpToByteOffset(byteOffset)
     }
 
@@ -448,8 +451,11 @@ final class ReaderViewController: UIViewController {
 
     private func openPage(preferredByteOffset: UInt64?) {
         openingTask?.cancel()
+        previousPageTask?.cancel()
         nextPageTask?.cancel()
+        previousPageTask = nil
         nextPageTask = nil
+        isLoadingNextPage = false
         pages = []
         currentPage = nil
         applyPagesSnapshot()
@@ -477,6 +483,7 @@ final class ReaderViewController: UIViewController {
                 applyInitialPage(result.page)
                 collectionView.setContentOffset(.zero, animated: false)
                 loadNextPageIfNeeded()
+                loadPreviousPageIfNeeded()
             } catch {
                 guard pagingGeneration == generation else {
                     return
@@ -507,6 +514,28 @@ final class ReaderViewController: UIViewController {
         adjustContentOffsetAfterRemovingPrefix(removedPrefixCount)
         refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: false)
+    }
+
+    private func prependPage(_ page: ReaderPage) {
+        guard !pages.contains(where: { $0.startByteOffset == page.startByteOffset }) else {
+            return
+        }
+
+        pages.insert(page, at: 0)
+        let pageWidth = collectionView.bounds.width
+        trimResidentPagesAfterPrepending()
+        applyPagesSnapshot()
+        if pageWidth > 0 {
+            collectionView.setContentOffset(
+                CGPoint(
+                    x: collectionView.contentOffset.x + pageWidth,
+                    y: collectionView.contentOffset.y
+                ),
+                animated: false
+            )
+        }
+        refreshVisibleCellsForActiveSettings()
+        updateSessionState(isLoadingNextPage: nextPageTask != nil)
     }
 
     private func applyPagesSnapshot() {
@@ -556,6 +585,45 @@ final class ReaderViewController: UIViewController {
                 }
                 nextPageTask = nil
                 updateSessionState(isLoadingNextPage: false)
+            }
+        }
+    }
+
+    private func loadPreviousPageIfNeeded() {
+        guard previousPageTask == nil,
+              let firstPage = pages.first,
+              firstPage.startByteOffset > 0 else {
+            return
+        }
+
+        let request = ReaderPreviousPageRequest(
+            bookID: book.id,
+            endByteOffset: firstPage.startByteOffset,
+            pageIndex: max(0, firstPage.pageIndex - 1),
+            layout: activeSettings.layout
+        )
+        let generation = pagingGeneration
+
+        previousPageTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let previousPage = try await pagingService.previousPage(request)
+                guard pagingGeneration == generation else {
+                    return
+                }
+                previousPageTask = nil
+                guard let previousPage else {
+                    return
+                }
+                prependPage(previousPage)
+            } catch {
+                guard pagingGeneration == generation else {
+                    return
+                }
+                previousPageTask = nil
             }
         }
     }
@@ -617,6 +685,23 @@ final class ReaderViewController: UIViewController {
         return removeCount
     }
 
+    private func trimResidentPagesAfterPrepending() {
+        guard pages.count > maximumResidentPages,
+              let currentPage,
+              let currentIndex = pages.firstIndex(of: currentPage) else {
+            return
+        }
+
+        let overflow = pages.count - maximumResidentPages
+        let removableAfterCurrent = max(0, pages.count - currentIndex - 4)
+        let removeCount = min(overflow, removableAfterCurrent)
+        guard removeCount > 0 else {
+            return
+        }
+
+        pages.removeLast(removeCount)
+    }
+
     private func trimResidentPagesAroundCurrent() {
         updateCurrentPageFromVisiblePage()
         guard let currentPage,
@@ -650,7 +735,7 @@ final class ReaderViewController: UIViewController {
     }
 
     private func updateSessionState(isLoadingNextPage: Bool) {
-        _ = isLoadingNextPage
+        self.isLoadingNextPage = isLoadingNextPage
         updateChrome()
     }
 
@@ -698,6 +783,9 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
 
         currentPage = pages[indexPath.item]
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
+        if indexPath.item <= 1 {
+            loadPreviousPageIfNeeded()
+        }
         if indexPath.item >= pages.count - 2 {
             loadNextPageIfNeeded()
         }
@@ -705,6 +793,7 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         updateCurrentPageFromVisiblePage()
+        loadPreviousPageIfNeeded()
         loadNextPageIfNeeded()
     }
 
