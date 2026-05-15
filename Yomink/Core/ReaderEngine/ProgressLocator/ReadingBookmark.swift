@@ -21,3 +21,8 @@ struct ReadingBookmark: Hashable, Codable, Sendable {
         self.createdAt = createdAt
     }
 }
+
+struct ReadingBookmarkAddResult: Hashable, Sendable {
+    let bookmark: ReadingBookmark
+    let didCreate: Bool
+}

@@ -70,6 +70,27 @@ extension DatabaseMigrator {
             }
         }
 
+        migrator.registerMigration("deduplicateBookmarks") { database in
+            try database.execute(
+                sql: """
+                DELETE FROM bookmarks
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM bookmarks AS kept
+                    WHERE kept.bookID = bookmarks.bookID
+                        AND kept.byteOffset = bookmarks.byteOffset
+                        AND (
+                            kept.createdAt < bookmarks.createdAt
+                            OR (kept.createdAt = bookmarks.createdAt AND kept.id < bookmarks.id)
+                        )
+                )
+                """
+            )
+            try database.execute(
+                sql: "CREATE UNIQUE INDEX IF NOT EXISTS bookmarks_on_bookID_byteOffset ON bookmarks(bookID, byteOffset)"
+            )
+        }
+
         return migrator
     }
 }

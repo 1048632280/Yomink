@@ -25,6 +25,31 @@ final class BookmarkRepository: @unchecked Sendable {
         return bookmark
     }
 
+    func insertIfNeeded(_ bookmark: ReadingBookmark) throws -> ReadingBookmarkAddResult {
+        guard let writer = databaseManager.writer else {
+            throw BookRepositoryError.databaseUnavailable
+        }
+
+        return try writer.write { database in
+            if let existingBookmark = try fetchBookmark(
+                bookID: bookmark.bookID,
+                byteOffset: bookmark.byteOffset,
+                database: database
+            ) {
+                return ReadingBookmarkAddResult(bookmark: existingBookmark, didCreate: false)
+            }
+
+            try database.execute(
+                sql: """
+                INSERT INTO bookmarks (id, bookID, title, byteOffset, createdAt)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                arguments: bookmark.databaseArguments
+            )
+            return ReadingBookmarkAddResult(bookmark: bookmark, didCreate: true)
+        }
+    }
+
     func fetchBookmarks(bookID: UUID) throws -> [ReadingBookmark] {
         guard let writer = databaseManager.writer else {
             return []
@@ -42,6 +67,42 @@ final class BookmarkRepository: @unchecked Sendable {
                 arguments: [bookID.uuidString]
             ).map(ReadingBookmark.init(databaseRow:))
         }
+    }
+
+    func deleteBookmark(id: UUID, bookID: UUID) throws {
+        guard let writer = databaseManager.writer else {
+            throw BookRepositoryError.databaseUnavailable
+        }
+
+        try writer.write { database in
+            try database.execute(
+                sql: "DELETE FROM bookmarks WHERE id = ? AND bookID = ?",
+                arguments: [id.uuidString, bookID.uuidString]
+            )
+        }
+    }
+
+    func fetchBookmark(bookID: UUID, byteOffset: UInt64) throws -> ReadingBookmark? {
+        guard let writer = databaseManager.writer else {
+            return nil
+        }
+
+        return try writer.read { database in
+            try fetchBookmark(bookID: bookID, byteOffset: byteOffset, database: database)
+        }
+    }
+
+    private func fetchBookmark(bookID: UUID, byteOffset: UInt64, database: Database) throws -> ReadingBookmark? {
+        try Row.fetchOne(
+            database,
+            sql: """
+            SELECT id, bookID, title, byteOffset, createdAt
+            FROM bookmarks
+            WHERE bookID = ? AND byteOffset = ?
+            LIMIT 1
+            """,
+            arguments: [bookID.uuidString, Int64(byteOffset)]
+        ).map(ReadingBookmark.init(databaseRow:))
     }
 }
 

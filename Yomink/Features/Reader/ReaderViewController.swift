@@ -222,8 +222,12 @@ final class ReaderViewController: UIViewController {
                 return
             }
             do {
-                _ = try await bookmarkService.addBookmark(bookID: book.id, page: currentPage)
-                showTransientNotice(title: "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}")
+                let result = try await bookmarkService.addBookmark(bookID: book.id, page: currentPage)
+                showTransientNotice(
+                    title: result.didCreate
+                        ? "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}"
+                        : "\u{5F53}\u{524D}\u{4F4D}\u{7F6E}\u{5DF2}\u{6709}\u{4E66}\u{7B7E}"
+                )
             } catch {
                 showTransientNotice(title: "\u{4E66}\u{7B7E}\u{4FDD}\u{5B58}\u{5931}\u{8D25}")
             }
@@ -259,6 +263,13 @@ final class ReaderViewController: UIViewController {
         listViewController.onBookmarkSelected = { [weak self] bookmark in
             self?.jumpToBookmark(bookmark)
         }
+        listViewController.onBookmarkDeleteRequested = { [weak self] bookmark, completion in
+            guard let self else {
+                completion(false)
+                return
+            }
+            self.deleteBookmark(bookmark, completion: completion)
+        }
         let navigationController = UINavigationController(rootViewController: listViewController)
         if let sheet = navigationController.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
@@ -273,6 +284,23 @@ final class ReaderViewController: UIViewController {
 
     private func jumpToBookmark(_ bookmark: ReadingBookmark) {
         jumpToByteOffset(bookmark.byteOffset)
+    }
+
+    private func deleteBookmark(_ bookmark: ReadingBookmark, completion: @escaping (Bool) -> Void) {
+        Task { [weak self] in
+            guard let self else {
+                completion(false)
+                return
+            }
+
+            do {
+                try await bookmarkService.deleteBookmark(bookmark)
+                completion(true)
+            } catch {
+                showTransientNotice(title: "\u{4E66}\u{7B7E}\u{5220}\u{9664}\u{5931}\u{8D25}")
+                completion(false)
+            }
+        }
     }
 
     private func jumpToByteOffset(_ byteOffset: UInt64) {

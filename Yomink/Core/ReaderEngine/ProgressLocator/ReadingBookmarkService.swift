@@ -7,7 +7,7 @@ final class ReadingBookmarkService: @unchecked Sendable {
         self.repository = repository
     }
 
-    func addBookmark(bookID: UUID, page: ReaderPage) async throws -> ReadingBookmark {
+    func addBookmark(bookID: UUID, page: ReaderPage) async throws -> ReadingBookmarkAddResult {
         let title = Self.makeBookmarkTitle(page: page)
         let bookmark = ReadingBookmark(
             bookID: bookID,
@@ -15,7 +15,7 @@ final class ReadingBookmarkService: @unchecked Sendable {
             byteOffset: page.startByteOffset
         )
         return try await Task.detached(priority: .utility) { [repository] in
-            try repository.insert(bookmark)
+            try repository.insertIfNeeded(bookmark)
         }.value
     }
 
@@ -25,17 +25,48 @@ final class ReadingBookmarkService: @unchecked Sendable {
         }.value
     }
 
-    private static func makeBookmarkTitle(page: ReaderPage) -> String {
-        let collapsedText = page.text
-            .split(whereSeparator: \.isNewline)
-            .lazy
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first { !$0.isEmpty }
-            ?? "\u{4E66}\u{7B7E}"
+    func deleteBookmark(_ bookmark: ReadingBookmark) async throws {
+        try await Task.detached(priority: .utility) { [repository] in
+            try repository.deleteBookmark(id: bookmark.id, bookID: bookmark.bookID)
+        }.value
+    }
 
-        if collapsedText.count <= 40 {
+    private static func makeBookmarkTitle(page: ReaderPage) -> String {
+        let collapsedText = page.text.split(whereSeparator: \.isNewline)
+            .lazy
+            .map { line in
+                String(line).stableBookmarkLine()
+            }
+            .first { !$0.isEmpty }
+            ?? "\u{4F4D}\u{7F6E} \(page.startByteOffset)"
+
+        if collapsedText.count <= 32 {
             return collapsedText
         }
-        return String(collapsedText.prefix(40))
+        return String(collapsedText.prefix(32))
+    }
+}
+
+private extension String {
+    func stableBookmarkLine() -> String {
+        var result = ""
+        var didAppendWhitespace = false
+
+        for scalar in unicodeScalars {
+            if CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                if !result.isEmpty {
+                    didAppendWhitespace = true
+                }
+                continue
+            }
+
+            if didAppendWhitespace {
+                result.append(" ")
+                didAppendWhitespace = false
+            }
+            result.append(String(scalar))
+        }
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

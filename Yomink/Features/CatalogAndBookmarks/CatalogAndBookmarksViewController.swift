@@ -18,9 +18,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
     var onChapterSelected: ((ReadingChapter) -> Void)?
     var onBookmarkSelected: ((ReadingBookmark) -> Void)?
+    var onBookmarkDeleteRequested: ((ReadingBookmark, @escaping (Bool) -> Void) -> Void)?
 
     private let chapters: [ReadingChapter]
-    private let bookmarks: [ReadingBookmark]
+    private var bookmarks: [ReadingBookmark]
     private let segmentedControl = UISegmentedControl(
         items: ["\u{76EE}\u{5F55}", "\u{4E66}\u{7B7E}"]
     )
@@ -32,6 +33,9 @@ final class CatalogAndBookmarksViewController: UIViewController {
             var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
             configuration.backgroundColor = YominkTheme.background
             configuration.showsSeparators = true
+            configuration.trailingSwipeActionsConfigurationProvider = { [weak self] indexPath in
+                self?.swipeActionsConfiguration(for: indexPath)
+            }
             return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: layoutEnvironment)
         }
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -129,10 +133,14 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private func applySnapshot() {
+        applySnapshot(animatingDifferences: false)
+    }
+
+    private func applySnapshot(animatingDifferences: Bool) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
         snapshot.appendSections([.main])
         snapshot.appendItems(itemsForSelectedSegment(), toSection: .main)
-        dataSource?.apply(snapshot, animatingDifferences: false)
+        dataSource?.apply(snapshot, animatingDifferences: animatingDifferences)
     }
 
     private func itemsForSelectedSegment() -> [Item] {
@@ -179,6 +187,51 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
     @objc private func close() {
         dismiss(animated: true)
+    }
+
+    private func swipeActionsConfiguration(for indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        guard selectedSegment == .bookmarks,
+              let item = dataSource?.itemIdentifier(for: indexPath),
+              case .bookmark(let bookmark) = item else {
+            return nil
+        }
+
+        let deleteAction = UIContextualAction(
+            style: .destructive,
+            title: "\u{5220}\u{9664}"
+        ) { [weak self] _, _, completion in
+            guard let self else {
+                completion(false)
+                return
+            }
+            self.requestDelete(bookmark, completion: completion)
+        }
+        return UISwipeActionsConfiguration(actions: [deleteAction])
+    }
+
+    private func requestDelete(_ bookmark: ReadingBookmark, completion: @escaping (Bool) -> Void) {
+        guard let onBookmarkDeleteRequested else {
+            removeBookmark(bookmark)
+            completion(true)
+            return
+        }
+
+        onBookmarkDeleteRequested(bookmark) { [weak self] didDelete in
+            DispatchQueue.main.async {
+                if didDelete {
+                    self?.removeBookmark(bookmark)
+                }
+                completion(didDelete)
+            }
+        }
+    }
+
+    private func removeBookmark(_ bookmark: ReadingBookmark) {
+        guard let index = bookmarks.firstIndex(where: { $0.id == bookmark.id }) else {
+            return
+        }
+        bookmarks.remove(at: index)
+        applySnapshot(animatingDifferences: true)
     }
 }
 
