@@ -1,8 +1,23 @@
 import Foundation
 
-enum BookImportError: Error {
+enum BookImportError: Error, Sendable {
     case emptyFile
     case missingSample
+    case duplicateBook(BookImportDuplicate)
+}
+
+enum BookImportDuplicateResolution: Sendable, Equatable {
+    case reject
+    case createCopy
+}
+
+struct BookImportDuplicate: Sendable {
+    let existingBook: BookRecord
+    let importedTitle: String
+
+    var copyTitle: String {
+        "\(importedTitle)-\u{526F}\u{672C}"
+    }
 }
 
 final class BookImportService: @unchecked Sendable {
@@ -16,14 +31,38 @@ final class BookImportService: @unchecked Sendable {
         self.fileManager = fileManager
     }
 
-    func importBook(from sourceURL: URL) async throws -> BookRecord {
+    func importBook(
+        from sourceURL: URL,
+        duplicateResolution: BookImportDuplicateResolution = .reject
+    ) async throws -> BookRecord {
         try await Task.detached(priority: .userInitiated) { [self] in
-            let preparedBook = try Self.prepareImport(from: sourceURL, fileManager: fileManager)
+            let source = try Self.inspectSource(from: sourceURL, fileManager: fileManager)
+            let duplicate = try Self.findDuplicate(
+                for: source,
+                candidates: bookRepository.fetchBooks(fileSize: source.fileSize),
+                fileManager: fileManager
+            )
+            if let duplicate,
+               duplicateResolution == .reject {
+                throw BookImportError.duplicateBook(
+                    BookImportDuplicate(
+                        existingBook: duplicate,
+                        importedTitle: source.title
+                    )
+                )
+            }
+
+            let preparedBook = try Self.prepareImport(
+                from: sourceURL,
+                source: source,
+                titleOverride: duplicate == nil ? nil : "\(source.title)-\u{526F}\u{672C}",
+                fileManager: fileManager
+            )
             return try bookRepository.insertImportedBook(preparedBook)
         }.value
     }
 
-    private static func prepareImport(from sourceURL: URL, fileManager: FileManager) throws -> BookRecord {
+    private static func inspectSource(from sourceURL: URL, fileManager: FileManager) throws -> SourceBookImport {
         let didAccess = sourceURL.startAccessingSecurityScopedResource()
         defer {
             if didAccess {
@@ -41,9 +80,34 @@ final class BookImportService: @unchecked Sendable {
         guard !sample.isEmpty else {
             throw BookImportError.missingSample
         }
+        let tailSample = try readTailSample(from: sourceURL, fileSize: fileSize)
 
         let decoder = TextDecoder()
         let encoding = decoder.detectEncoding(from: sample)
+        let title = inferTitle(sourceURL: sourceURL, sample: sample, encoding: encoding)
+
+        return SourceBookImport(
+            title: title,
+            encoding: encoding,
+            fileSize: fileSize,
+            headSample: sample,
+            tailSample: tailSample
+        )
+    }
+
+    private static func prepareImport(
+        from sourceURL: URL,
+        source: SourceBookImport,
+        titleOverride: String?,
+        fileManager: FileManager
+    ) throws -> BookRecord {
+        let didAccess = sourceURL.startAccessingSecurityScopedResource()
+        defer {
+            if didAccess {
+                sourceURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
         let id = UUID()
         let destinationURL = try destinationURL(for: id, fileManager: fileManager)
 
@@ -54,15 +118,38 @@ final class BookImportService: @unchecked Sendable {
 
         return BookRecord(
             id: id,
-            title: inferTitle(sourceURL: sourceURL, sample: sample, encoding: encoding),
+            title: titleOverride ?? source.title,
             author: nil,
             groupID: nil,
             filePath: destinationURL.path,
-            encoding: encoding,
-            fileSize: fileSize,
+            encoding: source.encoding,
+            fileSize: source.fileSize,
             importedAt: Date(),
             lastReadAt: nil
         )
+    }
+
+    private static func findDuplicate(
+        for source: SourceBookImport,
+        candidates: [BookRecord],
+        fileManager: FileManager
+    ) throws -> BookRecord? {
+        for candidate in candidates {
+            guard fileManager.fileExists(atPath: candidate.filePath) else {
+                continue
+            }
+
+            let candidateURL = candidate.fileURL
+            guard let candidateHeadSample = try? readSample(from: candidateURL),
+                  candidateHeadSample == source.headSample,
+                  let candidateTailSample = try? readTailSample(from: candidateURL, fileSize: candidate.fileSize),
+                  candidateTailSample == source.tailSample else {
+                continue
+            }
+            return candidate
+        }
+
+        return nil
     }
 
     private static func readSample(from sourceURL: URL) throws -> Data {
@@ -70,6 +157,17 @@ final class BookImportService: @unchecked Sendable {
         defer {
             try? handle.close()
         }
+        return try handle.read(upToCount: sampleLength) ?? Data()
+    }
+
+    private static func readTailSample(from sourceURL: URL, fileSize: UInt64) throws -> Data {
+        let handle = try FileHandle(forReadingFrom: sourceURL)
+        defer {
+            try? handle.close()
+        }
+
+        let offset = fileSize > UInt64(sampleLength) ? fileSize - UInt64(sampleLength) : 0
+        try handle.seek(toOffset: offset)
         return try handle.read(upToCount: sampleLength) ?? Data()
     }
 
@@ -95,4 +193,12 @@ final class BookImportService: @unchecked Sendable {
 
         return sourceURL.deletingPathExtension().lastPathComponent
     }
+}
+
+private struct SourceBookImport {
+    let title: String
+    let encoding: TextEncoding
+    let fileSize: UInt64
+    let headSample: Data
+    let tailSample: Data
 }

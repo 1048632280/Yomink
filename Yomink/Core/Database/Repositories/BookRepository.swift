@@ -75,6 +75,25 @@ final class BookRepository: @unchecked Sendable {
         try fetchBooks(sortMode: .lastReadAt)
     }
 
+    func fetchBooks(fileSize: UInt64) throws -> [BookRecord] {
+        guard let writer = databaseManager.writer else {
+            return []
+        }
+
+        return try writer.read { database in
+            try Row.fetchAll(
+                database,
+                sql: """
+                SELECT id, title, author, summary, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
+                FROM books
+                WHERE fileSize = ?
+                ORDER BY importedAt ASC
+                """,
+                arguments: [Int64(fileSize)]
+            ).map(BookRecord.init(databaseRow:))
+        }
+    }
+
     func fetchBookshelfItems(
         sortMode: BookshelfSortMode,
         groupFilter: BookshelfGroupFilter = .all,
