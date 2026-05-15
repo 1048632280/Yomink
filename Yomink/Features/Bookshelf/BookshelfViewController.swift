@@ -8,6 +8,7 @@ final class BookshelfViewController: UIViewController {
 
     var onImportRequested: (() -> Void)?
     var onBookSelected: ((BookRecord) -> Void)?
+    var onAppSettingsRequested: (() -> Void)?
 
     private let viewModel: BookshelfViewModel
     private var cancellables: Set<AnyCancellable> = []
@@ -62,7 +63,7 @@ final class BookshelfViewController: UIViewController {
 
     private func configureNavigationItems() {
         navigationItem.leftBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "folder"),
+            image: UIImage(systemName: "doc.text"),
             style: .plain,
             target: self,
             action: #selector(showGroups)
@@ -79,12 +80,6 @@ final class BookshelfViewController: UIViewController {
                 style: .plain,
                 target: self,
                 action: #selector(showSearch)
-            ),
-            UIBarButtonItem(
-                image: UIImage(systemName: "arrow.up.arrow.down"),
-                style: .plain,
-                target: self,
-                action: #selector(showSortOptions)
             )
         ]
     }
@@ -196,12 +191,13 @@ final class BookshelfViewController: UIViewController {
         drawer.onManageGroups = { [weak self] in
             self?.showGroupManagement()
         }
-
-        let navigationController = UINavigationController(rootViewController: drawer)
-        if let sheet = navigationController.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.prefersGrabberVisible = true
+        drawer.onAppSettings = { [weak self] in
+            self?.onAppSettingsRequested?()
         }
+
+        let navigationController = DrawerNavigationController(rootViewController: drawer, edge: .left)
+        navigationController.modalPresentationStyle = .custom
+        navigationController.transitioningDelegate = self
         present(navigationController, animated: true)
     }
 
@@ -215,11 +211,9 @@ final class BookshelfViewController: UIViewController {
             self?.showRecentBooks()
         }
 
-        let navigationController = UINavigationController(rootViewController: menu)
-        if let sheet = navigationController.sheetPresentationController {
-            sheet.detents = [.medium()]
-            sheet.prefersGrabberVisible = true
-        }
+        let navigationController = DrawerNavigationController(rootViewController: menu, edge: .right)
+        navigationController.modalPresentationStyle = .custom
+        navigationController.transitioningDelegate = self
         present(navigationController, animated: true)
     }
 
@@ -248,21 +242,6 @@ final class BookshelfViewController: UIViewController {
         navigationController.modalTransitionStyle = .crossDissolve
         navigationController.view.backgroundColor = .clear
         present(navigationController, animated: true)
-    }
-
-    @objc private func showSortOptions() {
-        endSelectionMode()
-        let alert = UIAlertController(title: "\u{6392}\u{5E8F}", message: nil, preferredStyle: .actionSheet)
-        for sortMode in BookshelfSortMode.allCases {
-            alert.addAction(
-                UIAlertAction(title: sortMode.title, style: .default) { [weak self] _ in
-                    self?.viewModel.setSortMode(sortMode)
-                }
-            )
-        }
-        alert.addAction(UIAlertAction(title: "\u{53D6}\u{6D88}", style: .cancel))
-        alert.popoverPresentationController?.barButtonItem = navigationItem.rightBarButtonItems?.last
-        present(alert, animated: true)
     }
 
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
@@ -533,5 +512,185 @@ extension BookshelfViewController: UICollectionViewDelegate {
                 }
             ])
         }
+    }
+}
+
+extension BookshelfViewController: UIViewControllerTransitioningDelegate {
+    func presentationController(
+        forPresented presented: UIViewController,
+        presenting: UIViewController?,
+        source: UIViewController
+    ) -> UIPresentationController? {
+        let edge = (presented as? DrawerNavigationController)?.edge ?? .left
+        return DrawerPresentationController(
+            presentedViewController: presented,
+            presenting: presenting,
+            edge: edge
+        )
+    }
+
+    func animationController(
+        forPresented presented: UIViewController,
+        presenting: UIViewController,
+        source: UIViewController
+    ) -> UIViewControllerAnimatedTransitioning? {
+        let edge = (presented as? DrawerNavigationController)?.edge ?? .left
+        return DrawerTransitionAnimator(edge: edge, isPresenting: true)
+    }
+
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        let edge = (dismissed as? DrawerNavigationController)?.edge ?? .left
+        return DrawerTransitionAnimator(edge: edge, isPresenting: false)
+    }
+}
+
+private enum DrawerEdge {
+    case left
+    case right
+}
+
+private final class DrawerNavigationController: UINavigationController {
+    let edge: DrawerEdge
+
+    init(rootViewController: UIViewController, edge: DrawerEdge) {
+        self.edge = edge
+        super.init(rootViewController: rootViewController)
+    }
+
+    @available(*, unavailable)
+    required init?(coder aDecoder: NSCoder) {
+        nil
+    }
+}
+
+private final class DrawerPresentationController: UIPresentationController {
+    private let dimmingView = UIView()
+    private let edge: DrawerEdge
+
+    init(
+        presentedViewController: UIViewController,
+        presenting presentingViewController: UIViewController?,
+        edge: DrawerEdge
+    ) {
+        self.edge = edge
+        super.init(presentedViewController: presentedViewController, presenting: presentingViewController)
+        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.22)
+        dimmingView.alpha = 0
+        dimmingView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(dismissPresented)))
+    }
+
+    override var frameOfPresentedViewInContainerView: CGRect {
+        guard let containerView else {
+            return .zero
+        }
+        let width = min(containerView.bounds.width * 0.82, 340)
+        let x = edge == .left ? CGFloat(0) : containerView.bounds.width - width
+        return CGRect(x: x, y: 0, width: width, height: containerView.bounds.height)
+    }
+
+    override func presentationTransitionWillBegin() {
+        guard let containerView else {
+            return
+        }
+        dimmingView.frame = containerView.bounds
+        containerView.insertSubview(dimmingView, at: 0)
+        presentedViewController.transitionCoordinator?.animate { [dimmingView] _ in
+            dimmingView.alpha = 1
+        }
+    }
+
+    override func dismissalTransitionWillBegin() {
+        presentedViewController.transitionCoordinator?.animate { [dimmingView] _ in
+            dimmingView.alpha = 0
+        }
+    }
+
+    override func containerViewWillLayoutSubviews() {
+        super.containerViewWillLayoutSubviews()
+        dimmingView.frame = containerView?.bounds ?? .zero
+        presentedView?.frame = frameOfPresentedViewInContainerView
+    }
+
+    @objc private func dismissPresented() {
+        presentedViewController.dismiss(animated: true)
+    }
+}
+
+private final class DrawerTransitionAnimator: NSObject, UIViewControllerAnimatedTransitioning {
+    private let edge: DrawerEdge
+    private let isPresenting: Bool
+
+    init(edge: DrawerEdge, isPresenting: Bool) {
+        self.edge = edge
+        self.isPresenting = isPresenting
+    }
+
+    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
+        0.22
+    }
+
+    func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
+        if isPresenting {
+            animatePresentation(using: transitionContext)
+        } else {
+            animateDismissal(using: transitionContext)
+        }
+    }
+
+    private func animatePresentation(using transitionContext: UIViewControllerContextTransitioning) {
+        guard let view = transitionContext.view(forKey: .to),
+              let viewController = transitionContext.viewController(forKey: .to) else {
+            transitionContext.completeTransition(false)
+            return
+        }
+
+        let containerView = transitionContext.containerView
+        let finalFrame = transitionContext.finalFrame(for: viewController)
+        view.frame = offscreenFrame(from: finalFrame, in: containerView)
+        containerView.addSubview(view)
+
+        UIView.animate(
+            withDuration: transitionDuration(using: transitionContext),
+            delay: 0,
+            options: [.curveEaseOut, .beginFromCurrentState]
+        ) {
+            view.frame = finalFrame
+        } completion: { _ in
+            transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
+        }
+    }
+
+    private func animateDismissal(using transitionContext: UIViewControllerContextTransitioning) {
+        guard let view = transitionContext.view(forKey: .from) else {
+            transitionContext.completeTransition(false)
+            return
+        }
+
+        let containerView = transitionContext.containerView
+        let finalFrame = offscreenFrame(from: view.frame, in: containerView)
+        UIView.animate(
+            withDuration: transitionDuration(using: transitionContext),
+            delay: 0,
+            options: [.curveEaseIn, .beginFromCurrentState]
+        ) {
+            view.frame = finalFrame
+        } completion: { _ in
+            let completed = !transitionContext.transitionWasCancelled
+            if completed {
+                view.removeFromSuperview()
+            }
+            transitionContext.completeTransition(completed)
+        }
+    }
+
+    private func offscreenFrame(from frame: CGRect, in containerView: UIView) -> CGRect {
+        var offscreenFrame = frame
+        switch edge {
+        case .left:
+            offscreenFrame.origin.x = -frame.width
+        case .right:
+            offscreenFrame.origin.x = containerView.bounds.width
+        }
+        return offscreenFrame
     }
 }

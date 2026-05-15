@@ -29,10 +29,28 @@ final class ReaderPageCell: UICollectionViewCell {
         pageView.configure(text: "", settings: .standard)
     }
 
-    func configure(page: ReaderPage, settings: ReadingSettings) {
+    func configure(page: ReaderPage, settings: ReadingSettings, filterRules: [ContentFilterRule] = []) {
         let palette = ReadingThemePalette.palette(for: settings.theme)
         contentView.backgroundColor = palette.background
-        pageView.configure(text: page.text, settings: settings)
+        pageView.configure(text: page.text.applyingContentFilters(filterRules), settings: settings)
+    }
+}
+
+private extension String {
+    func applyingContentFilters(_ rules: [ContentFilterRule]) -> String {
+        guard !rules.isEmpty, !isEmpty else {
+            return self
+        }
+
+        var filteredText = self
+        for rule in rules where !rule.sourceText.isEmpty {
+            filteredText = filteredText.replacingOccurrences(
+                of: rule.sourceText,
+                with: rule.replacementText ?? "",
+                options: [.caseInsensitive]
+            )
+        }
+        return filteredText
     }
 }
 

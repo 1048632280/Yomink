@@ -26,8 +26,8 @@ final class BookRepository: @unchecked Sendable {
         try writer.write { database in
             try database.execute(
                 sql: """
-                INSERT INTO books (id, title, author, groupID, filePath, encoding, fileSize, importedAt, lastReadAt)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO books (id, title, author, summary, groupID, filePath, encoding, fileSize, importedAt, lastReadAt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 arguments: book.databaseArguments
             )
@@ -44,7 +44,7 @@ final class BookRepository: @unchecked Sendable {
             guard let row = try Row.fetchOne(
                 database,
                 sql: """
-                SELECT id, title, author, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
+                SELECT id, title, author, summary, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
                 FROM books
                 WHERE id = ?
                 """,
@@ -63,7 +63,7 @@ final class BookRepository: @unchecked Sendable {
 
         return try writer.read { database in
             let sql = """
-            SELECT id, title, author, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
+            SELECT id, title, author, summary, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
             FROM books
             \(Self.orderClause(sortMode: sortMode))
             """
@@ -106,7 +106,7 @@ final class BookRepository: @unchecked Sendable {
 
             let whereClause = conditions.isEmpty ? "" : "WHERE \(conditions.joined(separator: " AND "))"
             let sql = """
-            SELECT books.id, books.title, books.author, books.groupID, books.filePath,
+            SELECT books.id, books.title, books.author, books.summary, books.groupID, books.filePath,
                 books.encoding, books.fileSize, books.importedAt, books.lastReadAt,
                 readingProgress.byteOffset AS progressByteOffset
             FROM books
@@ -129,7 +129,7 @@ final class BookRepository: @unchecked Sendable {
             try Row.fetchAll(
                 database,
                 sql: """
-                SELECT books.id, books.title, books.author, books.groupID, books.filePath,
+                SELECT books.id, books.title, books.author, books.summary, books.groupID, books.filePath,
                     books.encoding, books.fileSize, books.importedAt, books.lastReadAt,
                     readingProgress.byteOffset AS progressByteOffset
                 FROM books
@@ -153,6 +153,34 @@ final class BookRepository: @unchecked Sendable {
                 sql: "UPDATE books SET lastReadAt = ? WHERE id = ?",
                 arguments: [Date().timeIntervalSince1970, bookID.uuidString]
             )
+        }
+    }
+
+    func updateBookDetails(bookID: UUID, title: String, author: String?, summary: String?) throws -> BookRecord? {
+        guard let writer = databaseManager.writer else {
+            throw BookRepositoryError.databaseUnavailable
+        }
+
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedTitle.isEmpty else {
+            return try fetchBook(id: bookID)
+        }
+
+        return try writer.write { database in
+            try database.execute(
+                sql: """
+                UPDATE books
+                SET title = ?, author = ?, summary = ?
+                WHERE id = ?
+                """,
+                arguments: [
+                    normalizedTitle,
+                    author?.trimmedNilIfEmpty,
+                    summary?.trimmedNilIfEmpty,
+                    bookID.uuidString
+                ]
+            )
+            return try fetchBook(id: bookID, database: database)
         }
     }
 
@@ -204,7 +232,7 @@ final class BookRepository: @unchecked Sendable {
         try Row.fetchOne(
             database,
             sql: """
-            SELECT id, title, author, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
+            SELECT id, title, author, summary, groupID, filePath, encoding, fileSize, importedAt, lastReadAt
             FROM books
             WHERE id = ?
             """,
@@ -222,6 +250,8 @@ final class BookRepository: @unchecked Sendable {
         try database.execute(sql: "DELETE FROM chapterParseStates WHERE bookID = ?", arguments: arguments)
         try database.execute(sql: "DELETE FROM bookSearchIndex WHERE bookID = ?", arguments: arguments)
         try database.execute(sql: "DELETE FROM bookSearchIndexStates WHERE bookID = ?", arguments: arguments)
+        try database.execute(sql: "DELETE FROM contentFilterRules WHERE bookID = ?", arguments: arguments)
+        try database.execute(sql: "DELETE FROM tapAreaSettings WHERE scopeID = ?", arguments: arguments)
     }
 
     private static func orderClause(sortMode: BookshelfSortMode) -> String {
@@ -240,6 +270,7 @@ private extension BookRecord {
             id.uuidString,
             title,
             author,
+            summary,
             groupID?.uuidString,
             filePath,
             encoding.rawValue,
@@ -261,6 +292,7 @@ private extension BookRecord {
             id: UUID(uuidString: idString) ?? UUID(),
             title: row["title"],
             author: row["author"],
+            summary: row["summary"],
             groupID: groupIDString.flatMap(UUID.init(uuidString:)),
             filePath: row["filePath"],
             encoding: TextEncoding(rawValue: encodingRawValue) ?? .utf8,
@@ -281,5 +313,12 @@ private extension BookshelfBookItem {
             : min(1, Double(progressByteOffset) / Double(book.fileSize))
 
         self.init(book: book, readingProgress: progress)
+    }
+}
+
+private extension String {
+    var trimmedNilIfEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

@@ -40,6 +40,40 @@ final class SearchIndexServiceTests: XCTestCase {
         XCTAssertTrue(results.isEmpty)
     }
 
+    func testSearchIndexServiceFindsShortQueriesWithoutFullBookScan() async throws {
+        let databaseManager = try DatabaseManager.inMemory()
+        let bookRepository = BookRepository(databaseManager: databaseManager)
+        let service = SearchIndexService(
+            databaseManager: databaseManager,
+            bookRepository: bookRepository
+        )
+        let fileURL = try makeTemporaryTextFile(text: "An ox appears in a tiny indexed phrase.")
+        let book = try insertBook(fileURL: fileURL, repository: bookRepository)
+
+        service.scheduleIndexing(bookID: book.id)
+        let results = try await waitForResults(service: service, bookID: book.id, query: "ox")
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertTrue(results[0].snippet.contains("ox"))
+    }
+
+    func testSearchIndexServiceTreatsFTSSyntaxAsLiteralText() async throws {
+        let databaseManager = try DatabaseManager.inMemory()
+        let bookRepository = BookRepository(databaseManager: databaseManager)
+        let service = SearchIndexService(
+            databaseManager: databaseManager,
+            bookRepository: bookRepository
+        )
+        let fileURL = try makeTemporaryTextFile(text: "The marker needle+symbol belongs to the story.")
+        let book = try insertBook(fileURL: fileURL, repository: bookRepository)
+
+        service.scheduleIndexing(bookID: book.id)
+        let results = try await waitForResults(service: service, bookID: book.id, query: "needle+symbol")
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertTrue(results[0].snippet.contains("needle+symbol"))
+    }
+
     private func waitForResults(
         service: SearchIndexService,
         bookID: UUID,

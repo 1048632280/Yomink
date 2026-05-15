@@ -15,6 +15,7 @@ final class SearchIndexService: @unchecked Sendable {
     private let databaseManager: DatabaseManager
     private let bookRepository: BookRepository
     private var indexingTasks: [UUID: Task<Void, Never>] = [:]
+    private var suspendedBookIDs: Set<UUID> = []
     private let lock = NSLock()
 
     init(databaseManager: DatabaseManager, bookRepository: BookRepository) {
@@ -34,6 +35,9 @@ final class SearchIndexService: @unchecked Sendable {
     }
 
     func scheduleIndexing(bookID: UUID, startingAt byteOffset: UInt64 = 0) {
+        guard !isIndexingSuspended(bookID: bookID) else {
+            return
+        }
         if hasIndexingTask(bookID: bookID) {
             return
         }
@@ -61,9 +65,24 @@ final class SearchIndexService: @unchecked Sendable {
         tasks.forEach { $0.cancel() }
     }
 
+    func pauseIndexing(bookID: UUID) {
+        lock.lock()
+        suspendedBookIDs.insert(bookID)
+        let task = indexingTasks.removeValue(forKey: bookID)
+        lock.unlock()
+        task?.cancel()
+    }
+
+    func resumeIndexing(bookID: UUID, startingAt byteOffset: UInt64 = 0) {
+        lock.lock()
+        suspendedBookIDs.remove(bookID)
+        lock.unlock()
+        scheduleIndexing(bookID: bookID, startingAt: byteOffset)
+    }
+
     func search(bookID: UUID, query: String) async throws -> [BookSearchResult] {
-        let preparedQuery = Self.prepareQuery(query)
-        guard !preparedQuery.isEmpty else {
+        let normalizedQuery = Self.normalizedQuery(query)
+        guard !normalizedQuery.isEmpty else {
             return []
         }
 
@@ -75,18 +94,43 @@ final class SearchIndexService: @unchecked Sendable {
             }
 
             return try writer.read { database in
-                try Row.fetchAll(
-                    database,
-                    sql: """
-                    SELECT bookID, startByteOffset, endByteOffset, content
-                    FROM bookSearchIndex
-                    WHERE bookSearchIndex MATCH ? AND bookID = ?
-                    ORDER BY startByteOffset ASC
-                    LIMIT ?
-                    """,
-                    arguments: [preparedQuery, bookID.uuidString, Self.maximumResultCount]
-                ).compactMap { row in
-                    Self.makeSearchResult(row: row, query: query, encoding: encoding)
+                let usesFTS = normalizedQuery.count >= 3
+                let rows: [Row]
+                if usesFTS {
+                    do {
+                        rows = try Row.fetchAll(
+                            database,
+                            sql: Self.searchSQL(usesFTS: true),
+                            arguments: Self.searchArguments(
+                                bookID: bookID,
+                                query: normalizedQuery,
+                                usesFTS: true
+                            )
+                        )
+                    } catch {
+                        rows = try Row.fetchAll(
+                            database,
+                            sql: Self.searchSQL(usesFTS: false),
+                            arguments: Self.searchArguments(
+                                bookID: bookID,
+                                query: normalizedQuery,
+                                usesFTS: false
+                            )
+                        )
+                    }
+                } else {
+                    rows = try Row.fetchAll(
+                        database,
+                        sql: Self.searchSQL(usesFTS: false),
+                        arguments: Self.searchArguments(
+                            bookID: bookID,
+                            query: normalizedQuery,
+                            usesFTS: false
+                        )
+                    )
+                }
+                return rows.compactMap { row in
+                    Self.makeSearchResult(row: row, query: normalizedQuery, encoding: encoding)
                 }
             }
         }.value
@@ -152,6 +196,10 @@ final class SearchIndexService: @unchecked Sendable {
                     fileSize: mapping.fileSize,
                     completedAt: startByteOffset >= mapping.fileSize ? Date() : nil
                 )
+
+                // Full-text indexing is intentionally paced so large books never compete
+                // with paging or scrolling for sustained CPU while the reader is open.
+                try await Task.sleep(nanoseconds: 20_000_000)
             }
         } catch is CancellationError {
             return
@@ -165,6 +213,13 @@ final class SearchIndexService: @unchecked Sendable {
         let hasTask = indexingTasks[bookID] != nil
         lock.unlock()
         return hasTask
+    }
+
+    private func isIndexingSuspended(bookID: UUID) -> Bool {
+        lock.lock()
+        let isSuspended = suspendedBookIDs.contains(bookID)
+        lock.unlock()
+        return isSuspended
     }
 
     private func storeIndexingTask(_ task: Task<Void, Never>, bookID: UUID) {
@@ -260,13 +315,56 @@ final class SearchIndexService: @unchecked Sendable {
         }
     }
 
-    private static func prepareQuery(_ query: String) -> String {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedQuery.isEmpty else {
-            return ""
+    private static func searchSQL(usesFTS: Bool) -> String {
+        if usesFTS {
+            return """
+            SELECT bookID, startByteOffset, endByteOffset, content
+            FROM bookSearchIndex
+            WHERE bookSearchIndex MATCH ? AND bookID = ?
+            ORDER BY startByteOffset ASC
+            LIMIT ?
+            """
         }
 
-        return "\"\(trimmedQuery.replacingOccurrences(of: "\"", with: "\"\""))\""
+        return """
+        SELECT bookID, startByteOffset, endByteOffset, content
+        FROM bookSearchIndex
+        WHERE bookID = ? AND content COLLATE NOCASE LIKE ? ESCAPE '\'
+        ORDER BY startByteOffset ASC
+        LIMIT ?
+        """
+    }
+
+    private static func searchArguments(
+        bookID: UUID,
+        query: String,
+        usesFTS: Bool
+    ) -> StatementArguments {
+        if usesFTS {
+            return [Self.ftsPhrase(for: query), bookID.uuidString, Self.maximumResultCount]
+        }
+        return [
+            bookID.uuidString,
+            Self.likePattern(for: query),
+            Self.maximumResultCount
+        ]
+    }
+
+    private static func normalizedQuery(_ query: String) -> String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func ftsPhrase(for query: String) -> String {
+        let escapedQuery = query.replacingOccurrences(of: "\"", with: "\"\"")
+        return "\"\(escapedQuery)\""
+    }
+
+    private static func likePattern(for query: String) -> String {
+        let escapedQuery = query
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
+        return "%\(escapedQuery)%"
     }
 
     private static func makeSearchResult(row: Row, query: String, encoding: TextEncoding) -> BookSearchResult? {

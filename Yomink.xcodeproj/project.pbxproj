@@ -81,6 +81,16 @@
 		200000712000007120000071 /* BookshelfRecentViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000741000007410000074 /* BookshelfRecentViewController.swift */; };
 		200000722000007220000072 /* BookshelfSearchViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000751000007510000075 /* BookshelfSearchViewController.swift */; };
 		200000732000007320000073 /* GroupManagementViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000761000007610000076 /* GroupManagementViewController.swift */; };
+		200000752000007520000075 /* ContentFilterRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000781000007810000078 /* ContentFilterRule.swift */; };
+		200000762000007620000076 /* ContentFilterRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000791000007910000079 /* ContentFilterRepository.swift */; };
+		200000772000007720000077 /* ContentFilterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000801000008010000080 /* ContentFilterService.swift */; };
+		200000782000007820000078 /* TapAreaSettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000811000008110000081 /* TapAreaSettingsStore.swift */; };
+		200000792000007920000079 /* BookDetailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000821000008210000082 /* BookDetailService.swift */; };
+		200000802000008020000080 /* AppSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000831000008310000083 /* AppSettingsViewController.swift */; };
+		200000812000008120000081 /* BookDetailViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000841000008410000084 /* BookDetailViewController.swift */; };
+		200000822000008220000082 /* ContentFilterViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000851000008510000085 /* ContentFilterViewController.swift */; };
+		200000832000008320000083 /* TapAreaSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000861000008610000086 /* TapAreaSettingsViewController.swift */; };
+		200000842000008420000084 /* ReaderFeatureSettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000871000008710000087 /* ReaderFeatureSettingsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -171,6 +181,16 @@
 		100000741000007410000074 /* BookshelfRecentViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Bookshelf/BookshelfRecentViewController.swift"; sourceTree = "<group>"; };
 		100000751000007510000075 /* BookshelfSearchViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Bookshelf/BookshelfSearchViewController.swift"; sourceTree = "<group>"; };
 		100000761000007610000076 /* GroupManagementViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Groups/GroupManagementViewController.swift"; sourceTree = "<group>"; };
+		100000781000007810000078 /* ContentFilterRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Models/ContentFilterRule.swift"; sourceTree = "<group>"; };
+		100000791000007910000079 /* ContentFilterRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Repositories/ContentFilterRepository.swift"; sourceTree = "<group>"; };
+		100000801000008010000080 /* ContentFilterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ContentFilter/ContentFilterService.swift"; sourceTree = "<group>"; };
+		100000811000008110000081 /* TapAreaSettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Settings/TapAreaSettingsStore.swift"; sourceTree = "<group>"; };
+		100000821000008210000082 /* BookDetailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Repositories/BookDetailService.swift"; sourceTree = "<group>"; };
+		100000831000008310000083 /* AppSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/AppSettings/AppSettingsViewController.swift"; sourceTree = "<group>"; };
+		100000841000008410000084 /* BookDetailViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReaderMenu/BookDetailViewController.swift"; sourceTree = "<group>"; };
+		100000851000008510000085 /* ContentFilterViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ContentFilter/ContentFilterViewController.swift"; sourceTree = "<group>"; };
+		100000861000008610000086 /* TapAreaSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReaderMenu/TapAreaSettingsViewController.swift"; sourceTree = "<group>"; };
+		100000871000008710000087 /* ReaderFeatureSettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/ReaderFeatureSettingsTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -224,13 +244,17 @@
 				100000071000000710000007 /* BookRecord.swift */,
 				100000671000006710000067 /* BookGroupRecord.swift */,
 				100000681000006810000068 /* BookshelfBookItem.swift */,
+				100000781000007810000078 /* ContentFilterRule.swift */,
 				100000081000000810000008 /* BookRepository.swift */,
 				100000691000006910000069 /* BookGroupRepository.swift */,
 				100000541000005410000054 /* BookmarkRepository.swift */,
 				100000591000005910000059 /* ChapterRepository.swift */,
+				100000791000007910000079 /* ContentFilterRepository.swift */,
+				100000821000008210000082 /* BookDetailService.swift */,
 				100000091000000910000009 /* ChapterParser.swift */,
 				100000581000005810000058 /* ReadingChapter.swift */,
 				100000601000006010000060 /* ReadingChapterService.swift */,
+				100000801000008010000080 /* ContentFilterService.swift */,
 				100000101000001010000010 /* TextDecoder.swift */,
 				100000111000001110000011 /* TextEncoding.swift */,
 				100000121000001210000012 /* BookFileMapping.swift */,
@@ -253,6 +277,7 @@
 				100000201000002010000020 /* SearchIndexService.swift */,
 				100000211000002110000021 /* AppSettingsStore.swift */,
 				100000221000002210000022 /* ReadingSettingsStore.swift */,
+				100000811000008110000081 /* TapAreaSettingsStore.swift */,
 				100000231000002310000023 /* BookshelfViewController.swift */,
 				100000241000002410000024 /* BookshelfViewModel.swift */,
 				100000701000007010000070 /* BookDeletionService.swift */,
@@ -261,6 +286,7 @@
 				100000731000007310000073 /* BookMoveGroupViewController.swift */,
 				100000741000007410000074 /* BookshelfRecentViewController.swift */,
 				100000751000007510000075 /* BookshelfSearchViewController.swift */,
+				100000831000008310000083 /* AppSettingsViewController.swift */,
 				100000411000004110000041 /* BookImportService.swift */,
 				100000251000002510000025 /* ImportCoordinator.swift */,
 				100000261000002610000026 /* ReaderViewController.swift */,
@@ -269,7 +295,10 @@
 				100000501000005010000050 /* ReaderStatusBarView.swift */,
 				100000771000007710000077 /* AutoReadSpeedPanelView.swift */,
 				100000511000005110000051 /* ReaderSettingsViewController.swift */,
+				100000841000008410000084 /* BookDetailViewController.swift */,
+				100000861000008610000086 /* TapAreaSettingsViewController.swift */,
 				100000651000006510000065 /* BookSearchViewController.swift */,
+				100000851000008510000085 /* ContentFilterViewController.swift */,
 				100000761000007610000076 /* GroupManagementViewController.swift */,
 				100000561000005610000056 /* BookmarkListViewController.swift */,
 				100000611000006110000061 /* CatalogAndBookmarksViewController.swift */,
@@ -295,6 +324,7 @@
 				100000661000006610000066 /* SearchIndexServiceTests.swift */,
 				100000631000006310000063 /* ChapterRepositoryTests.swift */,
 				100000621000006210000062 /* ChapterParserTests.swift */,
+				100000871000008710000087 /* ReaderFeatureSettingsTests.swift */,
 			);
 			path = YominkTests;
 			sourceTree = "<group>";
@@ -414,13 +444,17 @@
 				200000072000000720000007 /* BookRecord.swift in Sources */,
 				200000642000006420000064 /* BookGroupRecord.swift in Sources */,
 				200000652000006520000065 /* BookshelfBookItem.swift in Sources */,
+				200000752000007520000075 /* ContentFilterRule.swift in Sources */,
 				200000082000000820000008 /* BookRepository.swift in Sources */,
 				200000662000006620000066 /* BookGroupRepository.swift in Sources */,
 				200000512000005120000051 /* BookmarkRepository.swift in Sources */,
 				200000562000005620000056 /* ChapterRepository.swift in Sources */,
+				200000762000007620000076 /* ContentFilterRepository.swift in Sources */,
+				200000792000007920000079 /* BookDetailService.swift in Sources */,
 				200000092000000920000009 /* ChapterParser.swift in Sources */,
 				200000552000005520000055 /* ReadingChapter.swift in Sources */,
 				200000572000005720000057 /* ReadingChapterService.swift in Sources */,
+				200000772000007720000077 /* ContentFilterService.swift in Sources */,
 				200000102000001020000010 /* TextDecoder.swift in Sources */,
 				200000112000001120000011 /* TextEncoding.swift in Sources */,
 				200000122000001220000012 /* BookFileMapping.swift in Sources */,
@@ -443,6 +477,7 @@
 				200000202000002020000020 /* SearchIndexService.swift in Sources */,
 				200000212000002120000021 /* AppSettingsStore.swift in Sources */,
 				200000222000002220000022 /* ReadingSettingsStore.swift in Sources */,
+				200000782000007820000078 /* TapAreaSettingsStore.swift in Sources */,
 				200000232000002320000023 /* BookshelfViewController.swift in Sources */,
 				200000242000002420000024 /* BookshelfViewModel.swift in Sources */,
 				200000672000006720000067 /* BookDeletionService.swift in Sources */,
@@ -451,6 +486,7 @@
 				200000702000007020000070 /* BookMoveGroupViewController.swift in Sources */,
 				200000712000007120000071 /* BookshelfRecentViewController.swift in Sources */,
 				200000722000007220000072 /* BookshelfSearchViewController.swift in Sources */,
+				200000802000008020000080 /* AppSettingsViewController.swift in Sources */,
 				200000382000003820000038 /* BookImportService.swift in Sources */,
 				200000252000002520000025 /* ImportCoordinator.swift in Sources */,
 				200000262000002620000026 /* ReaderViewController.swift in Sources */,
@@ -459,7 +495,10 @@
 				200000472000004720000047 /* ReaderStatusBarView.swift in Sources */,
 				200000742000007420000074 /* AutoReadSpeedPanelView.swift in Sources */,
 				200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */,
+				200000812000008120000081 /* BookDetailViewController.swift in Sources */,
+				200000832000008320000083 /* TapAreaSettingsViewController.swift in Sources */,
 				200000622000006220000062 /* BookSearchViewController.swift in Sources */,
+				200000822000008220000082 /* ContentFilterViewController.swift in Sources */,
 				200000732000007320000073 /* GroupManagementViewController.swift in Sources */,
 				200000532000005320000053 /* BookmarkListViewController.swift in Sources */,
 				200000582000005820000058 /* CatalogAndBookmarksViewController.swift in Sources */,
@@ -483,6 +522,7 @@
 				200000632000006320000063 /* SearchIndexServiceTests.swift in Sources */,
 				200000602000006020000060 /* ChapterRepositoryTests.swift in Sources */,
 				200000592000005920000059 /* ChapterParserTests.swift in Sources */,
+				200000842000008420000084 /* ReaderFeatureSettingsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

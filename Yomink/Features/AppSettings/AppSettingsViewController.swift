@@ -1,0 +1,60 @@
+import UIKit
+
+final class AppSettingsViewController: UIViewController {
+    var onSettingsChanged: (() -> Void)?
+
+    private let appSettingsStore: AppSettingsStore
+    private let sortControl = UISegmentedControl(items: BookshelfSortMode.allCases.map(\.title))
+
+    init(appSettingsStore: AppSettingsStore) {
+        self.appSettingsStore = appSettingsStore
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        nil
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        title = "\u{5E94}\u{7528}\u{8BBE}\u{7F6E}"
+        view.backgroundColor = YominkTheme.background
+        configureLayout()
+        refreshControls()
+    }
+
+    private func configureLayout() {
+        sortControl.addTarget(self, action: #selector(sortModeChanged), for: .valueChanged)
+
+        let titleLabel = UILabel()
+        titleLabel.text = "\u{4E66}\u{67B6}\u{6392}\u{5E8F}"
+        titleLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.textColor = YominkTheme.primaryText
+        titleLabel.adjustsFontForContentSizeCategory = true
+
+        let stackView = UIStackView(arrangedSubviews: [titleLabel, sortControl])
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        stackView.spacing = 14
+        stackView.isLayoutMarginsRelativeArrangement = true
+        stackView.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 24, leading: 20, bottom: 24, trailing: 20)
+        view.addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+    }
+
+    private func refreshControls() {
+        sortControl.selectedSegmentIndex = BookshelfSortMode.allCases.firstIndex(of: appSettingsStore.bookshelfSortMode) ?? 0
+    }
+
+    @objc private func sortModeChanged() {
+        let index = max(0, sortControl.selectedSegmentIndex)
+        appSettingsStore.bookshelfSortMode = BookshelfSortMode.allCases[index]
+        onSettingsChanged?()
+    }
+}

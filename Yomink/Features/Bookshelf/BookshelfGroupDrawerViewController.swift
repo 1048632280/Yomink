@@ -11,10 +11,12 @@ final class BookshelfGroupDrawerViewController: UIViewController {
         case ungrouped(Int)
         case group(BookGroupSummary)
         case manage
+        case appSettings
     }
 
     var onFilterSelected: ((BookshelfGroupFilter) -> Void)?
     var onManageGroups: (() -> Void)?
+    var onAppSettings: (() -> Void)?
 
     private let groupList: BookGroupList
     private let selectedFilter: BookshelfGroupFilter
@@ -37,7 +39,7 @@ final class BookshelfGroupDrawerViewController: UIViewController {
         self.groupList = groupList
         self.selectedFilter = selectedFilter
         super.init(nibName: nil, bundle: nil)
-        modalPresentationStyle = .pageSheet
+        modalPresentationStyle = .custom
     }
 
     @available(*, unavailable)
@@ -49,6 +51,7 @@ final class BookshelfGroupDrawerViewController: UIViewController {
         super.viewDidLoad()
         title = "\u{4E66}\u{67B6}"
         view.backgroundColor = YominkTheme.background
+        preferredContentSize = CGSize(width: 320, height: 0)
         configureNavigation()
         configureCollectionView()
         configureDataSource()
@@ -100,6 +103,11 @@ final class BookshelfGroupDrawerViewController: UIViewController {
                 content.secondaryText = nil
                 content.image = UIImage(systemName: "slider.horizontal.3")
                 cell.accessories = [.disclosureIndicator()]
+            case .appSettings:
+                content.text = "\u{5E94}\u{7528}\u{8BBE}\u{7F6E}"
+                content.secondaryText = nil
+                content.image = UIImage(systemName: "gearshape")
+                cell.accessories = [.disclosureIndicator()]
             }
 
             cell.contentConfiguration = content
@@ -121,7 +129,7 @@ final class BookshelfGroupDrawerViewController: UIViewController {
                 + groupList.groups.map(Item.group),
             toSection: .main
         )
-        snapshot.appendItems([.manage], toSection: .actions)
+        snapshot.appendItems([.manage, .appSettings], toSection: .actions)
         dataSource?.apply(snapshot, animatingDifferences: false)
     }
 
@@ -167,6 +175,10 @@ extension BookshelfGroupDrawerViewController: UICollectionViewDelegate {
         case .manage:
             dismiss(animated: true) { [onManageGroups] in
                 onManageGroups?()
+            }
+        case .appSettings:
+            dismiss(animated: true) { [onAppSettings] in
+                onAppSettings?()
             }
         }
     }

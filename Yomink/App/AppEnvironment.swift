@@ -7,7 +7,10 @@ struct AppEnvironment {
     let appSettingsStore: AppSettingsStore
     let readingSettingsStore: ReadingSettingsStore
     let readingProgressStore: ReadingProgressStore
+    let tapAreaSettingsStore: TapAreaSettingsStore
     let searchIndexService: SearchIndexService
+    let contentFilterService: ContentFilterService
+    let bookDetailService: BookDetailService
     let bookImportService: BookImportService
     let readingBookmarkService: ReadingBookmarkService
     let readingChapterService: ReadingChapterService
@@ -20,12 +23,19 @@ struct AppEnvironment {
         let bookGroupRepository = BookGroupRepository(databaseManager: databaseManager)
         let bookmarkRepository = BookmarkRepository(databaseManager: databaseManager)
         let chapterRepository = ChapterRepository(databaseManager: databaseManager)
+        let contentFilterRepository = ContentFilterRepository(databaseManager: databaseManager)
         let appSettingsStore = AppSettingsStore()
         let readingSettingsStore = ReadingSettingsStore()
         let readingProgressStore = ReadingProgressStore(databaseManager: databaseManager)
+        let tapAreaSettingsStore = TapAreaSettingsStore(databaseManager: databaseManager)
         let searchIndexService = SearchIndexService(
             databaseManager: databaseManager,
             bookRepository: bookRepository
+        )
+        let contentFilterService = ContentFilterService(repository: contentFilterRepository)
+        let bookDetailService = BookDetailService(
+            bookRepository: bookRepository,
+            chapterRepository: chapterRepository
         )
         let readerPageCache = ReaderPageCache()
         let bookImportService = BookImportService(bookRepository: bookRepository)
@@ -51,7 +61,10 @@ struct AppEnvironment {
             appSettingsStore: appSettingsStore,
             readingSettingsStore: readingSettingsStore,
             readingProgressStore: readingProgressStore,
+            tapAreaSettingsStore: tapAreaSettingsStore,
             searchIndexService: searchIndexService,
+            contentFilterService: contentFilterService,
+            bookDetailService: bookDetailService,
             bookImportService: bookImportService,
             readingBookmarkService: readingBookmarkService,
             readingChapterService: readingChapterService,

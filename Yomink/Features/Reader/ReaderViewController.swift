@@ -5,12 +5,15 @@ final class ReaderViewController: UIViewController {
         case main
     }
 
-    private let book: BookRecord
+    private var book: BookRecord
     private let openingService: ReaderOpeningService
     private let pagingService: ReaderPagingService
     private let bookmarkService: ReadingBookmarkService
     private let chapterService: ReadingChapterService
     private let searchIndexService: SearchIndexService
+    private let contentFilterService: ContentFilterService
+    private let bookDetailService: BookDetailService
+    private let tapAreaSettingsStore: TapAreaSettingsStore
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
@@ -22,10 +25,13 @@ final class ReaderViewController: UIViewController {
     private var pages: [ReaderPage] = []
     private var currentPage: ReaderPage?
     private var chapters: [ReadingChapter] = []
+    private var contentFilterRules: [ContentFilterRule] = []
+    private var tapAreaSettings = TapAreaSettings.standard
     private var openingTask: Task<Void, Never>?
     private var previousPageTask: Task<Void, Never>?
     private var nextPageTask: Task<Void, Never>?
     private var chapterRefreshTask: Task<Void, Never>?
+    private var backgroundWorkResumeTask: Task<Void, Never>?
     private var didStartOpening = false
     private var didReachEndOfBook = false
     private var isLoadingNextPage = false
@@ -35,6 +41,7 @@ final class ReaderViewController: UIViewController {
     private var autoReadSpeed: CGFloat = 36
     private var autoReadTickTask: Task<Void, Never>?
     private var activeSettings = ReadingSettings.standard
+    private var preferredInterfaceStyle: UIUserInterfaceStyle = .unspecified
     private var pagingGeneration = 0
     private let maximumResidentPages = 12
     private var usesVerticalScrolling: Bool {
@@ -48,6 +55,9 @@ final class ReaderViewController: UIViewController {
         bookmarkService: ReadingBookmarkService,
         chapterService: ReadingChapterService,
         searchIndexService: SearchIndexService,
+        contentFilterService: ContentFilterService,
+        bookDetailService: BookDetailService,
+        tapAreaSettingsStore: TapAreaSettingsStore,
         readingSettingsStore: ReadingSettingsStore,
         progressStore: ReadingProgressStore
     ) {
@@ -57,6 +67,9 @@ final class ReaderViewController: UIViewController {
         self.bookmarkService = bookmarkService
         self.chapterService = chapterService
         self.searchIndexService = searchIndexService
+        self.contentFilterService = contentFilterService
+        self.bookDetailService = bookDetailService
+        self.tapAreaSettingsStore = tapAreaSettingsStore
         self.readingSettingsStore = readingSettingsStore
         self.progressStore = progressStore
 
@@ -99,6 +112,7 @@ final class ReaderViewController: UIViewController {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
         applyReaderPreferences()
+        scheduleBackgroundWorkResume(after: 1.5)
     }
 
     override func didReceiveMemoryWarning() {
@@ -116,6 +130,7 @@ final class ReaderViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         stopAutoReading()
+        pauseBackgroundWork()
         saveCurrentProgress()
         UIApplication.shared.isIdleTimerDisabled = false
         UIDevice.current.isBatteryMonitoringEnabled = false
@@ -134,6 +149,7 @@ final class ReaderViewController: UIViewController {
         previousPageTask?.cancel()
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
+        backgroundWorkResumeTask?.cancel()
         chapterService.cancelParsing(bookID: book.id)
         searchIndexService.cancelIndexing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
@@ -167,7 +183,7 @@ final class ReaderViewController: UIViewController {
                   ) as? ReaderPageCell else {
                 return UICollectionViewCell()
             }
-            cell.configure(page: page, settings: activeSettings)
+            cell.configure(page: page, settings: activeSettings, filterRules: contentFilterRules)
             return cell
         }
     }
@@ -398,6 +414,7 @@ final class ReaderViewController: UIViewController {
 
     private func jumpToByteOffset(_ byteOffset: UInt64) {
         stopAutoReading()
+        pauseBackgroundWork()
         saveCurrentProgress()
         progressStore.remember(
             ReadingProgress(
@@ -409,6 +426,7 @@ final class ReaderViewController: UIViewController {
         progressStore.flushPendingProgress()
         pagingService.removeCachedPages()
         openPage(preferredByteOffset: byteOffset)
+        scheduleBackgroundWorkResume(after: 1.5)
     }
 
     private func handleChromeAction(_ action: ReaderChromeView.Action) {
@@ -429,7 +447,19 @@ final class ReaderViewController: UIViewController {
             showReadingSettings()
         case .autoRead:
             startAutoReading()
+        case .toggleDarkMode:
+            toggleDarkMode()
         }
+    }
+
+    private func toggleDarkMode() {
+        let enteringDarkMode = traitCollection.userInterfaceStyle != .dark
+        preferredInterfaceStyle = enteringDarkMode ? .dark : .light
+        overrideUserInterfaceStyle = preferredInterfaceStyle
+        activeSettings.theme = enteringDarkMode ? .black : .paper
+        readingSettingsStore.save(activeSettings)
+        applyTheme(activeSettings.theme)
+        refreshVisibleCellsForActiveSettings()
     }
 
     private func setChromeVisible(_ isVisible: Bool, animated: Bool) {
@@ -455,6 +485,7 @@ final class ReaderViewController: UIViewController {
             return
         }
 
+        pauseBackgroundWork()
         setChromeVisible(false, animated: true)
         isAutoReading = true
         setAutoReadPanelVisible(true, animated: true)
@@ -478,6 +509,7 @@ final class ReaderViewController: UIViewController {
         alignContentOffsetToCurrentPage()
         updateCurrentPageFromVisiblePage()
         saveCurrentProgress()
+        scheduleBackgroundWorkResume(after: 1.5)
     }
 
     private func configureCollectionViewForAutoReading() {
@@ -674,10 +706,34 @@ final class ReaderViewController: UIViewController {
         )
         alert.addAction(
             UIAlertAction(
+                title: "\u{4E66}\u{7C4D}\u{8BE6}\u{60C5}",
+                style: .default
+            ) { [weak self] _ in
+                self?.showBookDetails()
+            }
+        )
+        alert.addAction(
+            UIAlertAction(
                 title: "\u{5185}\u{5BB9}\u{641C}\u{7D22}",
                 style: .default
             ) { [weak self] _ in
                 self?.showBookSearch()
+            }
+        )
+        alert.addAction(
+            UIAlertAction(
+                title: "\u{5185}\u{5BB9}\u{51C0}\u{5316}",
+                style: .default
+            ) { [weak self] _ in
+                self?.showContentFilters()
+            }
+        )
+        alert.addAction(
+            UIAlertAction(
+                title: "\u{7FFB}\u{9875}\u{533A}\u{57DF}",
+                style: .default
+            ) { [weak self] _ in
+                self?.showTapAreaSettings()
             }
         )
         alert.addAction(UIAlertAction(title: "\u{597D}", style: .cancel))
@@ -694,7 +750,24 @@ final class ReaderViewController: UIViewController {
         present(alert, animated: true)
     }
 
+    private func showBookDetails() {
+        let viewController = BookDetailViewController(
+            bookID: book.id,
+            detailService: bookDetailService
+        )
+        viewController.onBookUpdated = { [weak self] updatedBook in
+            guard let self else {
+                return
+            }
+            book = updatedBook
+            title = updatedBook.title
+            updateChrome()
+        }
+        presentInNavigationSheet(viewController, detents: [.medium(), .large()])
+    }
+
     private func showBookSearch() {
+        resumeBackgroundWork()
         let searchViewController = BookSearchViewController(
             book: book,
             searchIndexService: searchIndexService
@@ -711,13 +784,83 @@ final class ReaderViewController: UIViewController {
         present(navigationController, animated: true)
     }
 
+    private func showContentFilters() {
+        let viewController = ContentFilterViewController(
+            bookID: book.id,
+            service: contentFilterService,
+            rules: contentFilterRules
+        )
+        viewController.onRulesChanged = { [weak self] rules in
+            self?.contentFilterRules = rules
+            self?.refreshVisibleCellsForActiveSettings()
+        }
+        presentInNavigationSheet(viewController, detents: [.medium(), .large()])
+    }
+
+    private func showTapAreaSettings() {
+        let viewController = TapAreaSettingsViewController(settings: tapAreaSettings)
+        viewController.onApply = { [weak self] settings in
+            guard let self else {
+                return
+            }
+            tapAreaSettings = settings
+            do {
+                try tapAreaSettingsStore.save(settings, bookID: book.id)
+            } catch {
+                showTransientNotice(title: "\u{533A}\u{57DF}\u{8BBE}\u{7F6E}\u{4FDD}\u{5B58}\u{5931}\u{8D25}")
+            }
+        }
+        presentInNavigationSheet(viewController, detents: [.medium()])
+    }
+
+    private func presentInNavigationSheet(_ viewController: UIViewController, detents: [UISheetPresentationController.Detent]) {
+        let navigationController = UINavigationController(rootViewController: viewController)
+        if let sheet = navigationController.sheetPresentationController {
+            sheet.detents = detents
+            sheet.prefersGrabberVisible = true
+        }
+        present(navigationController, animated: true)
+    }
+
+    private func pauseBackgroundWork() {
+        backgroundWorkResumeTask?.cancel()
+        backgroundWorkResumeTask = nil
+        chapterService.pauseParsing(bookID: book.id)
+        searchIndexService.pauseIndexing(bookID: book.id)
+    }
+
+    private func scheduleBackgroundWorkResume(after delay: TimeInterval) {
+        backgroundWorkResumeTask?.cancel()
+        backgroundWorkResumeTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            } catch {
+                return
+            }
+
+            guard let self,
+                  !isAutoReading,
+                  !collectionView.isDragging,
+                  !collectionView.isDecelerating,
+                  !collectionView.isTracking else {
+                return
+            }
+            resumeBackgroundWork()
+        }
+    }
+
+    private func resumeBackgroundWork() {
+        chapterService.resumeParsing(bookID: book.id)
+        searchIndexService.resumeIndexing(bookID: book.id, startingAt: currentPage?.startByteOffset ?? 0)
+    }
+
     private func refreshVisibleCellsForActiveSettings() {
         for indexPath in collectionView.indexPathsForVisibleItems {
             guard pages.indices.contains(indexPath.item),
                   let cell = collectionView.cellForItem(at: indexPath) as? ReaderPageCell else {
                 continue
             }
-            cell.configure(page: pages[indexPath.item], settings: activeSettings)
+            cell.configure(page: pages[indexPath.item], settings: activeSettings, filterRules: contentFilterRules)
         }
     }
 
@@ -730,9 +873,33 @@ final class ReaderViewController: UIViewController {
 
         didStartOpening = true
         activeSettings = readingSettingsStore.load().normalized(viewportSize: collectionView.bounds.size)
+        loadTapAreaSettings()
+        refreshContentFilterRules()
         applyReaderPreferences()
         applyTheme(activeSettings.theme)
         openPage(preferredByteOffset: nil)
+    }
+
+    private func loadTapAreaSettings() {
+        do {
+            tapAreaSettings = try tapAreaSettingsStore.load(bookID: book.id)
+        } catch {
+            tapAreaSettings = .standard
+        }
+    }
+
+    private func refreshContentFilterRules() {
+        Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
+            do {
+                contentFilterRules = try await contentFilterService.rules(bookID: book.id)
+                refreshVisibleCellsForActiveSettings()
+            } catch {
+                contentFilterRules = []
+            }
+        }
     }
 
     private func openPage(preferredByteOffset: UInt64?) {
@@ -1058,19 +1225,85 @@ final class ReaderViewController: UIViewController {
         }
 
         let location = gesture.location(in: collectionView)
-        let centralHorizontalRange = collectionView.bounds.width * 0.25...collectionView.bounds.width * 0.75
-        let centralVerticalRange = collectionView.bounds.height * 0.20...collectionView.bounds.height * 0.80
-        guard centralHorizontalRange.contains(location.x),
-              centralVerticalRange.contains(location.y) else {
-            return
-        }
-
         updateCurrentPageFromVisiblePage()
+
         if isAutoReading {
+            let centralHorizontalRange = collectionView.bounds.width * 0.25...collectionView.bounds.width * 0.75
+            let centralVerticalRange = collectionView.bounds.height * 0.20...collectionView.bounds.height * 0.80
+            guard centralHorizontalRange.contains(location.x),
+                  centralVerticalRange.contains(location.y) else {
+                return
+            }
             setAutoReadPanelVisible(!isAutoReadPanelVisible, animated: true)
             return
         }
-        setChromeVisible(!isChromeVisible, animated: true)
+
+        switch tapAreaSettings.action(for: tapAreaIndex(for: location)) {
+        case .toggleMenu:
+            setChromeVisible(!isChromeVisible, animated: true)
+        case .previousPage:
+            guard !isChromeVisible else {
+                return
+            }
+            pageBackwardFromTap()
+        case .nextPage:
+            guard !isChromeVisible else {
+                return
+            }
+            pageForwardFromTap()
+        }
+    }
+
+    private func tapAreaIndex(for location: CGPoint) -> Int {
+        let width = max(1, collectionView.bounds.width)
+        let height = max(1, collectionView.bounds.height)
+        let column = min(2, max(0, Int((location.x / width) * 3)))
+        let row = min(2, max(0, Int((location.y / height) * 3)))
+        return row * 3 + column
+    }
+
+    private func pageForwardFromTap() {
+        pauseBackgroundWork()
+        scheduleBackgroundWorkResume(after: 1.2)
+        guard let currentPage,
+              let currentIndex = pages.firstIndex(of: currentPage) else {
+            return
+        }
+
+        let nextIndex = currentIndex + 1
+        if pages.indices.contains(nextIndex) {
+            scrollToPage(at: nextIndex, animated: true)
+        } else {
+            loadNextPageIfNeeded()
+        }
+    }
+
+    private func pageBackwardFromTap() {
+        pauseBackgroundWork()
+        scheduleBackgroundWorkResume(after: 1.2)
+        guard let currentPage,
+              let currentIndex = pages.firstIndex(of: currentPage) else {
+            return
+        }
+
+        let previousIndex = currentIndex - 1
+        if pages.indices.contains(previousIndex) {
+            scrollToPage(at: previousIndex, animated: true)
+        } else {
+            loadPreviousPageIfNeeded()
+        }
+    }
+
+    private func scrollToPage(at index: Int, animated: Bool) {
+        guard pages.indices.contains(index) else {
+            return
+        }
+
+        let indexPath = IndexPath(item: index, section: 0)
+        let position: UICollectionView.ScrollPosition = usesVerticalScrolling ? .centeredVertically : .centeredHorizontally
+        collectionView.scrollToItem(at: indexPath, at: position, animated: animated)
+        currentPage = pages[index]
+        updateSessionState(isLoadingNextPage: nextPageTask != nil)
     }
 
     private func showTransientNotice(title: String) {
@@ -1112,6 +1345,7 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         updateCurrentPageFromVisiblePage()
         loadPreviousPageIfNeeded()
         loadNextPageIfNeeded()
+        scheduleBackgroundWorkResume(after: 1.5)
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -1122,9 +1356,11 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         updateCurrentPageFromVisiblePage()
         loadPreviousPageIfNeeded()
         loadNextPageIfNeeded()
+        scheduleBackgroundWorkResume(after: 1.5)
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        pauseBackgroundWork()
         if isAutoReading {
             stopAutoReading()
         }

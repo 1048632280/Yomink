@@ -8,6 +8,7 @@ final class ReadingChapterService: @unchecked Sendable {
     private let parser: ChapterParser
     private let lock = NSLock()
     private var parsingTasks: [UUID: Task<Void, Never>] = [:]
+    private var suspendedBookIDs: Set<UUID> = []
 
     init(
         bookRepository: BookRepository,
@@ -21,6 +22,10 @@ final class ReadingChapterService: @unchecked Sendable {
 
     func scheduleParsing(bookID: UUID) {
         lock.lock()
+        guard !suspendedBookIDs.contains(bookID) else {
+            lock.unlock()
+            return
+        }
         if parsingTasks[bookID] != nil {
             lock.unlock()
             return
@@ -38,7 +43,9 @@ final class ReadingChapterService: @unchecked Sendable {
                 guard try !chapterRepository.isParsingCompleted(bookID: bookID) else {
                     return
                 }
-                try parseChapters(for: book)
+                try await parseChapters(for: book)
+            } catch is CancellationError {
+                return
             } catch {
                 assertionFailure("Chapter parsing failed: \(error)")
             }
@@ -60,7 +67,22 @@ final class ReadingChapterService: @unchecked Sendable {
         task?.cancel()
     }
 
-    private func parseChapters(for book: BookRecord) throws {
+    func pauseParsing(bookID: UUID) {
+        lock.lock()
+        suspendedBookIDs.insert(bookID)
+        let task = parsingTasks.removeValue(forKey: bookID)
+        lock.unlock()
+        task?.cancel()
+    }
+
+    func resumeParsing(bookID: UUID) {
+        lock.lock()
+        suspendedBookIDs.remove(bookID)
+        lock.unlock()
+        scheduleParsing(bookID: bookID)
+    }
+
+    private func parseChapters(for book: BookRecord) async throws {
         try chapterRepository.deleteChapters(bookID: book.id)
         try chapterRepository.clearParsingState(bookID: book.id)
         var didCompleteParsing = false
@@ -120,6 +142,10 @@ final class ReadingChapterService: @unchecked Sendable {
                 windowEndByteOffset - windowStartByteOffset
             )
             windowStartByteOffset = nextStart > windowStartByteOffset ? nextStart : windowEndByteOffset
+
+            // Catalog parsing is useful but non-urgent; this cooperative pause keeps
+            // long TXT scans from keeping CPU warm during quiet reading.
+            try await Task.sleep(nanoseconds: 25_000_000)
         }
 
         try chapterRepository.insertChapters(pendingChapters)

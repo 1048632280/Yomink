@@ -10,6 +10,7 @@ final class ReaderChromeView: UIView {
         case catalog
         case settings
         case autoRead
+        case toggleDarkMode
     }
 
     var onAction: ((Action) -> Void)?
@@ -19,6 +20,7 @@ final class ReaderChromeView: UIView {
 
     private let topBar = UIView()
     private let bottomBar = UIView()
+    private let quickActionContainer = UIStackView()
     private let titleLabel = UILabel()
     private let progressLabel = UILabel()
     private let progressSlider = UISlider()
@@ -29,6 +31,7 @@ final class ReaderChromeView: UIView {
         configureView()
         configureTopBar()
         configureBottomBar()
+        configureQuickActions()
         setVisible(false, animated: false)
     }
 
@@ -124,8 +127,8 @@ final class ReaderChromeView: UIView {
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
         addSubview(bottomBar)
 
-        let previousButton = makeIconButton(systemName: "chevron.up", action: #selector(previousChapterTapped))
-        let nextButton = makeIconButton(systemName: "chevron.down", action: #selector(nextChapterTapped))
+        let previousButton = makeIconButton(systemName: "chevron.left", action: #selector(previousChapterTapped))
+        let nextButton = makeIconButton(systemName: "chevron.right", action: #selector(nextChapterTapped))
         progressSlider.addTarget(self, action: #selector(progressEditingBegan), for: .touchDown)
         progressSlider.addTarget(self, action: #selector(progressValueChanged), for: .valueChanged)
         progressSlider.addTarget(self, action: #selector(progressEditingEnded), for: [.touchUpInside, .touchUpOutside, .touchCancel])
@@ -140,10 +143,9 @@ final class ReaderChromeView: UIView {
         progressStack.alignment = .center
         progressStack.spacing = 12
 
-        let autoReadButton = makeLabeledButton(title: "\u{81EA}\u{52A8}", systemName: "play.circle", action: #selector(autoReadTapped))
         let catalogButton = makeLabeledButton(title: "\u{76EE}\u{5F55}", systemName: "list.bullet", action: #selector(catalogTapped))
         let settingsButton = makeLabeledButton(title: "\u{8BBE}\u{7F6E}", systemName: "textformat.size", action: #selector(settingsTapped))
-        let actionStack = UIStackView(arrangedSubviews: [autoReadButton, catalogButton, settingsButton])
+        let actionStack = UIStackView(arrangedSubviews: [catalogButton, settingsButton])
         actionStack.translatesAutoresizingMaskIntoConstraints = false
         actionStack.axis = .horizontal
         actionStack.alignment = .center
@@ -173,6 +175,28 @@ final class ReaderChromeView: UIView {
         ])
     }
 
+    private func configureQuickActions() {
+        quickActionContainer.translatesAutoresizingMaskIntoConstraints = false
+        quickActionContainer.axis = .vertical
+        quickActionContainer.alignment = .center
+        quickActionContainer.spacing = 10
+        addSubview(quickActionContainer)
+
+        let autoReadButton = makeFloatingButton(systemName: "play.fill", action: #selector(autoReadTapped))
+        let darkModeButton = makeFloatingButton(systemName: "moon.fill", action: #selector(darkModeTapped))
+        quickActionContainer.addArrangedSubview(autoReadButton)
+        quickActionContainer.addArrangedSubview(darkModeButton)
+
+        NSLayoutConstraint.activate([
+            quickActionContainer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            quickActionContainer.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -14),
+            autoReadButton.widthAnchor.constraint(equalToConstant: 46),
+            autoReadButton.heightAnchor.constraint(equalToConstant: 46),
+            darkModeButton.widthAnchor.constraint(equalToConstant: 46),
+            darkModeButton.heightAnchor.constraint(equalToConstant: 46)
+        ])
+    }
+
     private func makeIconButton(systemName: String, action: Selector) -> UIButton {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -193,6 +217,14 @@ final class ReaderChromeView: UIView {
         return button
     }
 
+    private func makeFloatingButton(systemName: String, action: Selector) -> UIButton {
+        let button = makeIconButton(systemName: systemName, action: action)
+        button.backgroundColor = .secondarySystemBackground
+        button.layer.cornerRadius = 23
+        button.layer.masksToBounds = true
+        return button
+    }
+
     private func applyTheme(_ theme: ReadingTheme) {
         let palette = ReadingThemePalette.palette(for: theme)
         topBar.backgroundColor = palette.chromeBackground
@@ -201,6 +233,9 @@ final class ReaderChromeView: UIView {
         progressLabel.textColor = palette.secondaryText
         progressSlider.tintColor = palette.primaryText
         tintColor = palette.primaryText
+        quickActionContainer.arrangedSubviews.forEach { view in
+            view.backgroundColor = palette.chromeBackground
+        }
     }
 
     @objc private func progressEditingBegan() {
@@ -249,6 +284,10 @@ final class ReaderChromeView: UIView {
         onAction?(.autoRead)
     }
 
+    @objc private func darkModeTapped() {
+        onAction?(.toggleDarkMode)
+    }
+
     @objc private func backgroundTapped(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended else {
             return
@@ -256,7 +295,8 @@ final class ReaderChromeView: UIView {
 
         let location = gesture.location(in: self)
         guard !topBar.frame.contains(location),
-              !bottomBar.frame.contains(location) else {
+              !bottomBar.frame.contains(location),
+              !quickActionContainer.frame.contains(location) else {
             return
         }
         onBackgroundTap?()

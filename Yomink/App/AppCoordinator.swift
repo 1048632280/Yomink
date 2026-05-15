@@ -31,6 +31,9 @@ final class AppCoordinator {
         bookshelfViewController.onBookSelected = { [weak self] book in
             self?.openReader(book)
         }
+        bookshelfViewController.onAppSettingsRequested = { [weak self] in
+            self?.showAppSettings()
+        }
         importCoordinator.onPickedDocument = { [weak self] url in
             self?.importBook(from: url)
         }
@@ -79,10 +82,21 @@ final class AppCoordinator {
             bookmarkService: environment.readingBookmarkService,
             chapterService: environment.readingChapterService,
             searchIndexService: environment.searchIndexService,
+            contentFilterService: environment.contentFilterService,
+            bookDetailService: environment.bookDetailService,
+            tapAreaSettingsStore: environment.tapAreaSettingsStore,
             readingSettingsStore: environment.readingSettingsStore,
             progressStore: environment.readingProgressStore
         )
         navigationController.pushViewController(readerViewController, animated: true)
+    }
+
+    private func showAppSettings() {
+        let viewController = AppSettingsViewController(appSettingsStore: environment.appSettingsStore)
+        viewController.onSettingsChanged = { [weak self] in
+            self?.bookshelfViewController?.refreshBooks()
+        }
+        navigationController.pushViewController(viewController, animated: true)
     }
 
     private func presentError(title: String, message: String) {

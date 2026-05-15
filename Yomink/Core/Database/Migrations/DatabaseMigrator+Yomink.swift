@@ -138,6 +138,37 @@ extension DatabaseMigrator {
             )
         }
 
+        migrator.registerMigration("addBookSummary") { database in
+            try database.alter(table: "books") { table in
+                table.add(column: "summary", .text)
+            }
+        }
+
+        migrator.registerMigration("createContentFilterRules") { database in
+            try database.create(table: "contentFilterRules", ifNotExists: true) { table in
+                table.column("id", .text).primaryKey()
+                table.column("bookID", .text).notNull()
+                table.column("sourceText", .text).notNull()
+                table.column("replacementText", .text)
+                table.column("createdAt", .double).notNull()
+            }
+            try database.execute(
+                sql: "CREATE INDEX IF NOT EXISTS contentFilterRules_on_bookID ON contentFilterRules(bookID)"
+            )
+        }
+
+        migrator.registerMigration("createTapAreaSettings") { database in
+            try database.create(table: "tapAreaSettings", ifNotExists: true) { table in
+                table.column("scopeID", .text).notNull()
+                table.column("areaIndex", .integer).notNull()
+                table.column("action", .text).notNull()
+                table.column("updatedAt", .double).notNull()
+            }
+            try database.execute(
+                sql: "CREATE UNIQUE INDEX IF NOT EXISTS tapAreaSettings_on_scopeID_areaIndex ON tapAreaSettings(scopeID, areaIndex)"
+            )
+        }
+
         return migrator
     }
 }
