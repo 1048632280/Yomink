@@ -34,23 +34,22 @@ final class SearchIndexService: @unchecked Sendable {
     }
 
     func scheduleIndexing(bookID: UUID, startingAt byteOffset: UInt64 = 0) {
-        lock.lock()
-        if indexingTasks[bookID] != nil {
-            lock.unlock()
+        if hasIndexingTask(bookID: bookID) {
             return
         }
 
-        let task = Task.detached(priority: .utility) { [weak self] in
-            await self?.buildIndex(bookID: bookID, startingAt: byteOffset)
+        let task: Task<Void, Never> = Task.detached(priority: .utility) { [weak self] in
+            guard let self else {
+                return
+            }
+
+            await self.buildIndex(bookID: bookID, startingAt: byteOffset)
         }
-        indexingTasks[bookID] = task
-        lock.unlock()
+        storeIndexingTask(task, bookID: bookID)
     }
 
     func cancelIndexing(bookID: UUID) {
-        lock.lock()
-        let task = indexingTasks.removeValue(forKey: bookID)
-        lock.unlock()
+        let task = removeIndexingTask(bookID: bookID)
         task?.cancel()
     }
 
@@ -113,9 +112,7 @@ final class SearchIndexService: @unchecked Sendable {
 
     private func buildIndex(bookID: UUID, startingAt requestedByteOffset: UInt64) async {
         defer {
-            lock.lock()
-            indexingTasks.removeValue(forKey: bookID)
-            lock.unlock()
+            removeIndexingTask(bookID: bookID)
         }
 
         do {
@@ -161,6 +158,27 @@ final class SearchIndexService: @unchecked Sendable {
         } catch {
             return
         }
+    }
+
+    private func hasIndexingTask(bookID: UUID) -> Bool {
+        lock.lock()
+        let hasTask = indexingTasks[bookID] != nil
+        lock.unlock()
+        return hasTask
+    }
+
+    private func storeIndexingTask(_ task: Task<Void, Never>, bookID: UUID) {
+        lock.lock()
+        indexingTasks[bookID] = task
+        lock.unlock()
+    }
+
+    @discardableResult
+    private func removeIndexingTask(bookID: UUID) -> Task<Void, Never>? {
+        lock.lock()
+        let task = indexingTasks.removeValue(forKey: bookID)
+        lock.unlock()
+        return task
     }
 
     private func insertChunk(
