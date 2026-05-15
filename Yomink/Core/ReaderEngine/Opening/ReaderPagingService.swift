@@ -129,7 +129,11 @@ final class ReaderPagingService: @unchecked Sendable {
             request.layout.fontName,
             "\(request.layout.fontSize)",
             "\(request.layout.lineSpacing)",
-            "\(request.layout.paragraphSpacing)"
+            "\(request.layout.paragraphSpacing)",
+            "\(request.layout.contentInsets.top)",
+            "\(request.layout.contentInsets.left)",
+            "\(request.layout.contentInsets.bottom)",
+            "\(request.layout.contentInsets.right)"
         ].joined(separator: ":")
     }
 
@@ -143,7 +147,11 @@ final class ReaderPagingService: @unchecked Sendable {
             request.layout.fontName,
             "\(request.layout.fontSize)",
             "\(request.layout.lineSpacing)",
-            "\(request.layout.paragraphSpacing)"
+            "\(request.layout.paragraphSpacing)",
+            "\(request.layout.contentInsets.top)",
+            "\(request.layout.contentInsets.left)",
+            "\(request.layout.contentInsets.bottom)",
+            "\(request.layout.contentInsets.right)"
         ].joined(separator: ":")
     }
 

@@ -1,8 +1,21 @@
 import UIKit
 
 final class ReaderStatusBarView: UIView {
-    private let stackView = UIStackView()
-    private var labels: [UILabel] = []
+    struct ChapterProgress: Hashable {
+        let pageIndex: Int
+        let pageCount: Int?
+
+        var displayText: String {
+            if let pageCount {
+                return "\u{672C}\u{7AE0} \(pageIndex + 1)/\(pageCount) \u{9875}"
+            }
+            return "\u{672C}\u{7AE0}\u{7B2C} \(pageIndex + 1) \u{9875}"
+        }
+    }
+
+    private let topLeftLabel = UILabel()
+    private let bottomLeftStackView = UIStackView()
+    private let bottomRightStackView = UIStackView()
     private var currentTheme: ReadingTheme = .paper
 
     override init(frame: CGRect) {
@@ -18,94 +31,127 @@ final class ReaderStatusBarView: UIView {
     func configure(
         state: ReaderSessionState,
         settings: ReadingSettings,
-        chapterTitle: String?
+        chapterTitle: String?,
+        chapterProgress: ChapterProgress?
     ) {
-        let texts = ReadingStatusBarItem.allCases
-            .filter { settings.statusBarItems.contains($0) }
-            .compactMap { text(for: $0, state: state, chapterTitle: chapterTitle) }
+        let visibleItems = settings.statusBarItems
+        topLeftLabel.text = visibleItems.contains(.chapterTitle) ? chapterTitle : nil
 
-        isHidden = texts.isEmpty
-        rebuildLabels(texts)
+        let bottomLeftTexts: [String?] = [
+            visibleItems.contains(.batteryPercent) ? batteryPercentText() : nil,
+            visibleItems.contains(.battery) ? batteryStateText() : nil,
+            visibleItems.contains(.time) ? Date().formatted(date: .omitted, time: .shortened) : nil
+        ]
+        rebuildLabels(in: bottomLeftStackView, texts: bottomLeftTexts.compactMap { $0 })
+
+        let bottomRightTexts: [String?] = [
+            visibleItems.contains(.chapterPageProgress) ? chapterProgress?.displayText : nil,
+            visibleItems.contains(.bookProgress) ? state.progressPercentText : nil
+        ]
+        rebuildLabels(in: bottomRightStackView, texts: bottomRightTexts.compactMap { $0 })
+
+        isHidden = topLeftLabel.text?.isEmpty != false
+            && bottomLeftStackView.arrangedSubviews.isEmpty
+            && bottomRightStackView.arrangedSubviews.isEmpty
     }
 
     func applyTheme(_ theme: ReadingTheme) {
         currentTheme = theme
-        let palette = ReadingThemePalette.palette(for: theme)
-        backgroundColor = palette.chromeBackground
-        for label in labels {
-            label.textColor = palette.secondaryText
+        backgroundColor = .clear
+        applyTextColor(to: topLeftLabel)
+        for stackView in [bottomLeftStackView, bottomRightStackView] {
+            for case let label as UILabel in stackView.arrangedSubviews {
+                applyTextColor(to: label)
+            }
         }
     }
 
     private func configureView() {
         isUserInteractionEnabled = false
-        applyTheme(.paper)
+        backgroundColor = .clear
 
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.axis = .horizontal
-        stackView.alignment = .center
-        stackView.distribution = .equalSpacing
-        stackView.spacing = 12
+        topLeftLabel.translatesAutoresizingMaskIntoConstraints = false
+        topLeftLabel.font = .preferredFont(forTextStyle: .caption1)
+        topLeftLabel.adjustsFontForContentSizeCategory = true
+        topLeftLabel.lineBreakMode = .byTruncatingTail
+        topLeftLabel.numberOfLines = 1
+        topLeftLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        addSubview(stackView)
+        bottomLeftStackView.translatesAutoresizingMaskIntoConstraints = false
+        bottomLeftStackView.axis = .horizontal
+        bottomLeftStackView.alignment = .center
+        bottomLeftStackView.spacing = 8
+        bottomLeftStackView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        bottomRightStackView.translatesAutoresizingMaskIntoConstraints = false
+        bottomRightStackView.axis = .horizontal
+        bottomRightStackView.alignment = .center
+        bottomRightStackView.spacing = 8
+        bottomRightStackView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        addSubview(topLeftLabel)
+        addSubview(bottomLeftStackView)
+        addSubview(bottomRightStackView)
+
         NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 24),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -24),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            topLeftLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 6),
+            topLeftLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20),
+
+            bottomLeftStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            bottomLeftStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            bottomLeftStackView.trailingAnchor.constraint(lessThanOrEqualTo: bottomRightStackView.leadingAnchor, constant: -12),
+            bottomLeftStackView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.48),
+
+            bottomRightStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            bottomRightStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            bottomRightStackView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.48)
         ])
+
+        applyTheme(.paper)
     }
 
-    private func rebuildLabels(_ texts: [String]) {
-        for label in labels {
-            stackView.removeArrangedSubview(label)
-            label.removeFromSuperview()
+    private func rebuildLabels(in stackView: UIStackView, texts: [String]) {
+        for view in stackView.arrangedSubviews {
+            stackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
         }
 
-        labels = texts.map { text in
+        for text in texts {
             let label = UILabel()
             label.text = text
             label.font = .preferredFont(forTextStyle: .caption1)
             label.adjustsFontForContentSizeCategory = true
-            label.textColor = ReadingThemePalette.palette(for: currentTheme).secondaryText
             label.lineBreakMode = .byTruncatingTail
             label.numberOfLines = 1
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            applyTextColor(to: label)
             stackView.addArrangedSubview(label)
-            return label
         }
     }
 
-    private func text(
-        for item: ReadingStatusBarItem,
-        state: ReaderSessionState,
-        chapterTitle: String?
-    ) -> String? {
-        switch item {
-        case .time:
-            return Date().formatted(date: .omitted, time: .shortened)
-        case .battery:
-            switch UIDevice.current.batteryState {
-            case .charging, .full:
-                return "\u{7535}\u{6C60}\u{5145}\u{7535}"
-            case .unplugged:
-                return "\u{7535}\u{6C60}"
-            case .unknown:
-                return nil
-            @unknown default:
-                return nil
-            }
-        case .batteryPercent:
-            let level = UIDevice.current.batteryLevel
-            guard level >= 0 else {
-                return nil
-            }
-            return "\(Int((level * 100).rounded()))%"
-        case .chapterTitle:
-            return chapterTitle
-        case .chapterPageProgress:
-            return "\u{7B2C} \(state.currentPageIndex + 1) \u{9875}"
-        case .bookProgress:
-            return state.progressPercentText
+    private func applyTextColor(to label: UILabel) {
+        label.textColor = ReadingThemePalette.palette(for: currentTheme).secondaryText
+    }
+
+    private func batteryPercentText() -> String? {
+        let level = UIDevice.current.batteryLevel
+        guard level >= 0 else {
+            return nil
+        }
+        return "\(Int((level * 100).rounded()))%"
+    }
+
+    private func batteryStateText() -> String? {
+        switch UIDevice.current.batteryState {
+        case .charging, .full:
+            return "\u{7535}\u{6C60}\u{5145}\u{7535}"
+        case .unplugged:
+            return "\u{7535}\u{6C60}"
+        case .unknown:
+            return nil
+        @unknown default:
+            return nil
         }
     }
 }

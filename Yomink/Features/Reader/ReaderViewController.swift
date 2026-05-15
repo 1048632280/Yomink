@@ -59,6 +59,12 @@ final class ReaderViewController: UIViewController {
         isAutoReading || activeSettings.pageTurnMode == .verticalScroll
     }
 
+    private var pageRenderingSettings: ReadingSettings {
+        var settings = activeSettings
+        settings.layout = effectiveReadingLayout(from: activeSettings.layout)
+        return settings
+    }
+
     init(
         book: BookRecord,
         openingService: ReaderOpeningService,
@@ -204,7 +210,7 @@ final class ReaderViewController: UIViewController {
                   ) as? ReaderPageCell else {
                 return UICollectionViewCell()
             }
-            cell.configure(page: page, settings: activeSettings, filterRules: contentFilterRules)
+            cell.configure(page: page, settings: pageRenderingSettings, filterRules: contentFilterRules)
             return cell
         }
     }
@@ -214,10 +220,10 @@ final class ReaderViewController: UIViewController {
         statusBarView.isHidden = true
         view.addSubview(statusBarView)
         NSLayoutConstraint.activate([
-            statusBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
+            statusBarView.topAnchor.constraint(equalTo: view.topAnchor),
             statusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             statusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            statusBarView.heightAnchor.constraint(equalToConstant: 28)
+            statusBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
@@ -397,6 +403,26 @@ final class ReaderViewController: UIViewController {
         }
         layout.invalidateLayout()
         collectionView.layoutIfNeeded()
+    }
+
+    private func effectiveReadingLayout(from layout: ReadingLayout) -> ReadingLayout {
+        var adjustedLayout = layout
+        let safeAreaInsets = view.safeAreaInsets
+        let reservedTop = max(34, safeAreaInsets.top + 34)
+        let reservedBottom = max(34, safeAreaInsets.bottom + 34)
+        let reservesBottom = activeSettings.statusBarItems.contains(.batteryPercent)
+            || activeSettings.statusBarItems.contains(.battery)
+            || activeSettings.statusBarItems.contains(.time)
+            || activeSettings.statusBarItems.contains(.chapterPageProgress)
+            || activeSettings.statusBarItems.contains(.bookProgress)
+
+        if activeSettings.statusBarItems.contains(.chapterTitle) {
+            adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, reservedTop)
+        }
+        if reservesBottom {
+            adjustedLayout.contentInsets.bottom = max(adjustedLayout.contentInsets.bottom, reservedBottom)
+        }
+        return adjustedLayout
     }
 
     @objc private func addBookmark() {
@@ -752,10 +778,12 @@ final class ReaderViewController: UIViewController {
             return
         }
 
+        let chapter = nearestChapter(atOrBefore: state.startByteOffset)
         statusBarView.configure(
             state: state,
             settings: activeSettings,
-            chapterTitle: nearestChapter(atOrBefore: state.startByteOffset)?.title
+            chapterTitle: chapter?.title,
+            chapterProgress: chapterProgress(for: state, chapter: chapter)
         )
     }
 
@@ -823,6 +851,37 @@ final class ReaderViewController: UIViewController {
 
     private func nearestChapter(atOrBefore byteOffset: UInt64) -> ReadingChapter? {
         chapters.last { $0.byteOffset <= byteOffset }
+    }
+
+    private func chapterProgress(
+        for state: ReaderSessionState,
+        chapter: ReadingChapter?
+    ) -> ReaderStatusBarView.ChapterProgress {
+        guard let currentPage else {
+            return ReaderStatusBarView.ChapterProgress(pageIndex: state.currentPageIndex, pageCount: nil)
+        }
+
+        guard let chapter else {
+            return ReaderStatusBarView.ChapterProgress(pageIndex: state.currentPageIndex, pageCount: nil)
+        }
+
+        let nextChapter = chapters.first { $0.byteOffset > chapter.byteOffset }
+        let chapterEndByteOffset = min(book.fileSize, nextChapter?.byteOffset ?? book.fileSize)
+        guard chapterEndByteOffset > chapter.byteOffset else {
+            return ReaderStatusBarView.ChapterProgress(pageIndex: state.currentPageIndex, pageCount: nil)
+        }
+
+        let pageByteCount = max(UInt64(1), currentPage.endByteOffset - currentPage.startByteOffset)
+        let chapterByteCount = max(UInt64(1), chapterEndByteOffset - chapter.byteOffset)
+        let completedByteCount = state.startByteOffset > chapter.byteOffset
+            ? state.startByteOffset - chapter.byteOffset
+            : 0
+        let pageCount = max(1, Int(ceil(Double(chapterByteCount) / Double(pageByteCount))))
+        let pageIndex = min(pageCount - 1, Int(Double(completedByteCount) / Double(pageByteCount)))
+        return ReaderStatusBarView.ChapterProgress(
+            pageIndex: max(0, pageIndex),
+            pageCount: pageCount
+        )
     }
 
     private func refreshChapters() {
@@ -1107,7 +1166,7 @@ final class ReaderViewController: UIViewController {
                   let cell = collectionView.cellForItem(at: indexPath) as? ReaderPageCell else {
                 continue
             }
-            cell.configure(page: pages[indexPath.item], settings: activeSettings, filterRules: contentFilterRules)
+            cell.configure(page: pages[indexPath.item], settings: pageRenderingSettings, filterRules: contentFilterRules)
         }
     }
 
@@ -1169,7 +1228,7 @@ final class ReaderViewController: UIViewController {
         let request = ReaderOpeningRequest(
             bookID: book.id,
             viewportSize: collectionView.bounds.size,
-            layout: activeSettings.layout,
+            layout: effectiveReadingLayout(from: activeSettings.layout),
             preferredByteOffset: preferredByteOffset
         )
 
@@ -1284,7 +1343,7 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             startByteOffset: lastPage.endByteOffset,
             pageIndex: lastPage.pageIndex + 1,
-            layout: activeSettings.layout
+            layout: effectiveReadingLayout(from: activeSettings.layout)
         )
         let generation = pagingGeneration
 
@@ -1358,7 +1417,7 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             endByteOffset: firstPage.startByteOffset,
             pageIndex: max(0, firstPage.pageIndex - 1),
-            layout: activeSettings.layout
+            layout: effectiveReadingLayout(from: activeSettings.layout)
         )
         let generation = pagingGeneration
 
