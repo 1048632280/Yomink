@@ -426,7 +426,7 @@ final class BookshelfViewController: UIViewController {
 
     private func performDeleteSelectedBooks() {
         let bookIDs = Array(selectedBookIDs)
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else {
                 return
             }

@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 
+@MainActor
 final class BookshelfViewModel {
     enum Item: Hashable {
         case book(BookshelfBookItem)
