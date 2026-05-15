@@ -431,13 +431,31 @@ final class ReaderViewController: UIViewController {
             return
         }
         let bookmarkPage = currentPage
+        let shouldRemoveBookmark = isCurrentPageBookmarked
 
         Task { [weak self] in
             guard let self else {
                 return
             }
             do {
-                let result = try await bookmarkService.addBookmark(bookID: book.id, page: bookmarkPage)
+                if shouldRemoveBookmark {
+                    if let bookmark = try await bookmarkService.bookmark(
+                        bookID: book.id,
+                        byteOffset: bookmarkPage.startByteOffset
+                    ) {
+                        try await bookmarkService.deleteBookmark(bookmark)
+                    }
+                    if self.currentPage?.startByteOffset == bookmarkPage.startByteOffset {
+                        bookmarkStateTask?.cancel()
+                        bookmarkStateTask = nil
+                        isCurrentPageBookmarked = false
+                        bookmarkStateByteOffset = bookmarkPage.startByteOffset
+                        chromeView.setBookmarkActive(false)
+                    }
+                    return
+                }
+
+                _ = try await bookmarkService.addBookmark(bookID: book.id, page: bookmarkPage)
                 if self.currentPage?.startByteOffset == bookmarkPage.startByteOffset {
                     bookmarkStateTask?.cancel()
                     bookmarkStateTask = nil
@@ -445,13 +463,8 @@ final class ReaderViewController: UIViewController {
                     bookmarkStateByteOffset = bookmarkPage.startByteOffset
                     chromeView.setBookmarkActive(true)
                 }
-                showTransientNotice(
-                    title: result.didCreate
-                        ? "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}"
-                        : "\u{5F53}\u{524D}\u{4F4D}\u{7F6E}\u{5DF2}\u{6709}\u{4E66}\u{7B7E}"
-                )
             } catch {
-                showTransientNotice(title: "\u{4E66}\u{7B7E}\u{4FDD}\u{5B58}\u{5931}\u{8D25}")
+                refreshBookmarkState(force: true)
             }
         }
     }

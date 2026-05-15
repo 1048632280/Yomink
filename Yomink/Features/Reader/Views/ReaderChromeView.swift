@@ -67,7 +67,7 @@ final class ReaderChromeView: UIView {
         isBookmarkActive = isActive
         let symbolName = isActive ? "bookmark.fill" : "bookmark"
         bookmarkButton.setImage(UIImage(systemName: symbolName), for: .normal)
-        bookmarkButton.accessibilityLabel = isActive ? "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}" : "\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}"
+        bookmarkButton.accessibilityLabel = isActive ? "\u{53D6}\u{6D88}\u{4E66}\u{7B7E}" : "\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}"
         bookmarkButton.tintColor = isActive ? activeBookmarkTintColor : inactiveBookmarkTintColor
     }
 
