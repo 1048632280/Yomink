@@ -97,6 +97,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
     var layoutDensity: ReadingLayoutDensity
     var keepScreenAwake: Bool
     var autoHideHomeIndicator: Bool
+    var allowsSwipeBack: Bool
     var statusBarItems: Set<ReadingStatusBarItem>
 
     static let standard = ReadingSettings(
@@ -106,6 +107,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         layoutDensity: .standard,
         keepScreenAwake: false,
         autoHideHomeIndicator: false,
+        allowsSwipeBack: false,
         statusBarItems: []
     )
 
@@ -116,6 +118,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         layoutDensity: ReadingLayoutDensity,
         keepScreenAwake: Bool,
         autoHideHomeIndicator: Bool,
+        allowsSwipeBack: Bool,
         statusBarItems: Set<ReadingStatusBarItem>
     ) {
         self.layout = layout
@@ -124,6 +127,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         self.layoutDensity = layoutDensity
         self.keepScreenAwake = keepScreenAwake
         self.autoHideHomeIndicator = autoHideHomeIndicator
+        self.allowsSwipeBack = allowsSwipeBack
         self.statusBarItems = statusBarItems
     }
 
@@ -134,6 +138,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         case layoutDensity
         case keepScreenAwake
         case autoHideHomeIndicator
+        case allowsSwipeBack
         case statusBarItems
     }
 
@@ -152,6 +157,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         ) ?? (layout == defaults.layout ? defaults.layoutDensity : .custom)
         keepScreenAwake = try container.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? false
         autoHideHomeIndicator = try container.decodeIfPresent(Bool.self, forKey: .autoHideHomeIndicator) ?? false
+        allowsSwipeBack = try container.decodeIfPresent(Bool.self, forKey: .allowsSwipeBack) ?? false
         statusBarItems = try container.decodeIfPresent(
             Set<ReadingStatusBarItem>.self,
             forKey: .statusBarItems

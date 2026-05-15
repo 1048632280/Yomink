@@ -20,6 +20,7 @@ final class ReaderViewController: UIViewController {
     private let chromeView = ReaderChromeView()
     private let statusBarView = ReaderStatusBarView()
     private let autoReadPanelView = AutoReadSpeedPanelView()
+    private var moreMenuView: UIView?
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, ReaderPage>?
     private var pages: [ReaderPage] = []
@@ -31,7 +32,10 @@ final class ReaderViewController: UIViewController {
     private var previousPageTask: Task<Void, Never>?
     private var nextPageTask: Task<Void, Never>?
     private var chapterRefreshTask: Task<Void, Never>?
+    private var bookmarkStateTask: Task<Void, Never>?
     private var backgroundWorkResumeTask: Task<Void, Never>?
+    private var bookmarkStateByteOffset: UInt64?
+    private var isCurrentPageBookmarked = false
     private var shouldScrollToPreviousPageAfterLoad = false
     private var shouldScrollToNextPageAfterLoad = false
     private var didStartOpening = false
@@ -45,6 +49,9 @@ final class ReaderViewController: UIViewController {
     private var activeSettings = ReadingSettings.standard
     private var preferredInterfaceStyle: UIUserInterfaceStyle = .unspecified
     private var pagingGeneration = 0
+    private weak var previousInteractivePopGestureDelegate: UIGestureRecognizerDelegate?
+    private var previousInteractivePopGestureWasEnabled = true
+    private var didCaptureInteractivePopGestureState = false
     private let maximumResidentPages = 12
     private var usesVerticalScrolling: Bool {
         isAutoReading || activeSettings.pageTurnMode == .verticalScroll
@@ -117,6 +124,11 @@ final class ReaderViewController: UIViewController {
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        configureSwipeBackGesture()
+    }
+
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         pagingService.removeCachedPages()
@@ -139,6 +151,7 @@ final class ReaderViewController: UIViewController {
         if isMovingFromParent || navigationController?.isBeingDismissed == true {
             navigationController?.setNavigationBarHidden(false, animated: animated)
         }
+        restoreSwipeBackGestureAfterTransitionIfNeeded()
     }
 
     deinit {
@@ -151,7 +164,9 @@ final class ReaderViewController: UIViewController {
         previousPageTask?.cancel()
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
+        bookmarkStateTask?.cancel()
         backgroundWorkResumeTask?.cancel()
+        restoreSwipeBackGesture()
         chapterService.cancelParsing(bookID: book.id)
         searchIndexService.cancelIndexing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
@@ -234,6 +249,7 @@ final class ReaderViewController: UIViewController {
             self?.handleChromeAction(action)
         }
         chromeView.onBackgroundTap = { [weak self] in
+            self?.dismissMoreMenu(animated: true)
             self?.setChromeVisible(false, animated: true)
         }
         chromeView.onProgressPreview = { [weak self] progress in
@@ -297,8 +313,64 @@ final class ReaderViewController: UIViewController {
         UIDevice.current.isBatteryMonitoringEnabled = activeSettings.statusBarItems.contains(.battery)
             || activeSettings.statusBarItems.contains(.batteryPercent)
         setNeedsUpdateOfHomeIndicatorAutoHidden()
+        configureSwipeBackGesture()
         configureCollectionViewForActiveSettings()
         updateStatusBar()
+    }
+
+    private func configureSwipeBackGesture() {
+        guard let navigationController,
+              let gesture = navigationController.interactivePopGestureRecognizer else {
+            return
+        }
+
+        if !didCaptureInteractivePopGestureState {
+            previousInteractivePopGestureDelegate = gesture.delegate
+            previousInteractivePopGestureWasEnabled = gesture.isEnabled
+            didCaptureInteractivePopGestureState = true
+        }
+
+        let shouldEnable = activeSettings.allowsSwipeBack && navigationController.viewControllers.count > 1
+        if shouldEnable {
+            gesture.delegate = self
+        } else {
+            gesture.delegate = previousInteractivePopGestureDelegate
+        }
+        gesture.isEnabled = shouldEnable
+    }
+
+    private func restoreSwipeBackGestureAfterTransitionIfNeeded() {
+        guard didCaptureInteractivePopGestureState else {
+            return
+        }
+
+        guard let transitionCoordinator else {
+            restoreSwipeBackGesture()
+            return
+        }
+
+        transitionCoordinator.animate(alongsideTransition: nil) { [weak self] context in
+            guard let self else {
+                return
+            }
+            if context.isCancelled {
+                configureSwipeBackGesture()
+            } else {
+                restoreSwipeBackGesture()
+            }
+        }
+    }
+
+    private func restoreSwipeBackGesture() {
+        guard didCaptureInteractivePopGestureState,
+              let gesture = navigationController?.interactivePopGestureRecognizer else {
+            return
+        }
+
+        gesture.delegate = previousInteractivePopGestureDelegate
+        gesture.isEnabled = previousInteractivePopGestureWasEnabled
+        previousInteractivePopGestureDelegate = nil
+        didCaptureInteractivePopGestureState = false
     }
 
     private func configureCollectionViewForActiveSettings() {
@@ -330,13 +402,21 @@ final class ReaderViewController: UIViewController {
         guard let currentPage else {
             return
         }
+        let bookmarkPage = currentPage
 
         Task { [weak self] in
             guard let self else {
                 return
             }
             do {
-                let result = try await bookmarkService.addBookmark(bookID: book.id, page: currentPage)
+                let result = try await bookmarkService.addBookmark(bookID: book.id, page: bookmarkPage)
+                if self.currentPage?.startByteOffset == bookmarkPage.startByteOffset {
+                    bookmarkStateTask?.cancel()
+                    bookmarkStateTask = nil
+                    isCurrentPageBookmarked = true
+                    bookmarkStateByteOffset = bookmarkPage.startByteOffset
+                    chromeView.setBookmarkActive(true)
+                }
                 showTransientNotice(
                     title: result.didCreate
                         ? "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}"
@@ -409,6 +489,9 @@ final class ReaderViewController: UIViewController {
 
             do {
                 try await bookmarkService.deleteBookmark(bookmark)
+                if currentPage?.startByteOffset == bookmark.byteOffset {
+                    refreshBookmarkState(force: true)
+                }
                 completion(true)
             } catch {
                 showTransientNotice(title: "\u{4E66}\u{7B7E}\u{5220}\u{9664}\u{5931}\u{8D25}")
@@ -468,6 +551,9 @@ final class ReaderViewController: UIViewController {
     }
 
     private func setChromeVisible(_ isVisible: Bool, animated: Bool) {
+        if !isVisible {
+            dismissMoreMenu(animated: animated)
+        }
         isChromeVisible = isVisible
         updateChrome()
         chromeView.setVisible(isVisible, animated: animated)
@@ -602,7 +688,57 @@ final class ReaderViewController: UIViewController {
             state: currentSessionState(),
             theme: activeSettings.theme
         )
+        chromeView.setBookmarkActive(isCurrentPageBookmarked)
         updateStatusBar()
+    }
+
+    private func refreshBookmarkState(force: Bool = false) {
+        guard let currentPage else {
+            resetBookmarkState()
+            return
+        }
+
+        let byteOffset = currentPage.startByteOffset
+        guard force || bookmarkStateByteOffset != byteOffset else {
+            chromeView.setBookmarkActive(isCurrentPageBookmarked)
+            return
+        }
+
+        bookmarkStateTask?.cancel()
+        bookmarkStateByteOffset = byteOffset
+        isCurrentPageBookmarked = false
+        chromeView.setBookmarkActive(false)
+
+        bookmarkStateTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let bookmark = try await bookmarkService.bookmark(bookID: book.id, byteOffset: byteOffset)
+                guard !Task.isCancelled,
+                      currentPage?.startByteOffset == byteOffset else {
+                    return
+                }
+                isCurrentPageBookmarked = bookmark != nil
+                chromeView.setBookmarkActive(bookmark != nil)
+            } catch {
+                guard currentPage?.startByteOffset == byteOffset else {
+                    return
+                }
+                isCurrentPageBookmarked = false
+                chromeView.setBookmarkActive(false)
+            }
+            bookmarkStateTask = nil
+        }
+    }
+
+    private func resetBookmarkState() {
+        bookmarkStateTask?.cancel()
+        bookmarkStateTask = nil
+        bookmarkStateByteOffset = nil
+        isCurrentPageBookmarked = false
+        chromeView.setBookmarkActive(false)
     }
 
     private func updateStatusBar() {
@@ -702,57 +838,150 @@ final class ReaderViewController: UIViewController {
     }
 
     private func showMoreMenu() {
-        stopAutoReading()
-        setChromeVisible(false, animated: true)
-        let alert = UIAlertController(
-            title: "\u{66F4}\u{591A}",
-            message: nil,
-            preferredStyle: .actionSheet
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: "\u{4E66}\u{7C4D}\u{8BE6}\u{60C5}",
-                style: .default
-            ) { [weak self] _ in
-                self?.showBookDetails()
-            }
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: "\u{5185}\u{5BB9}\u{641C}\u{7D22}",
-                style: .default
-            ) { [weak self] _ in
-                self?.showBookSearch()
-            }
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: "\u{5185}\u{5BB9}\u{51C0}\u{5316}",
-                style: .default
-            ) { [weak self] _ in
-                self?.showContentFilters()
-            }
-        )
-        alert.addAction(
-            UIAlertAction(
-                title: "\u{7FFB}\u{9875}\u{533A}\u{57DF}",
-                style: .default
-            ) { [weak self] _ in
-                self?.showTapAreaSettings()
-            }
-        )
-        alert.addAction(UIAlertAction(title: "\u{597D}", style: .cancel))
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = view
-            popover.sourceRect = CGRect(
-                x: view.bounds.midX,
-                y: view.bounds.maxY - 1,
-                width: 1,
-                height: 1
-            )
-            popover.permittedArrowDirections = []
+        guard !isAutoReading else {
+            setAutoReadPanelVisible(true, animated: true)
+            return
         }
-        present(alert, animated: true)
+
+        if moreMenuView != nil {
+            dismissMoreMenu(animated: true)
+            return
+        }
+
+        view.layoutIfNeeded()
+        let rowHeight: CGFloat = 44
+        let menuWidth: CGFloat = 156
+        let menuTitles = [
+            "\u{4E66}\u{7C4D}\u{8BE6}\u{60C5}",
+            "\u{5185}\u{5BB9}\u{641C}\u{7D22}",
+            "\u{5185}\u{5BB9}\u{51C0}\u{5316}",
+            "\u{7FFB}\u{9875}\u{533A}\u{57DF}"
+        ]
+        let separatorHeight = 1 / UIScreen.main.scale
+        let menuHeight = CGFloat(menuTitles.count) * rowHeight
+            + CGFloat(max(0, menuTitles.count - 1)) * separatorHeight
+        let anchorFrame = chromeView.moreButtonFrame(in: view)
+        let safeFrame = view.safeAreaLayoutGuide.layoutFrame
+        let trailingX = min(anchorFrame.maxX, safeFrame.maxX - 12)
+        let originX = max(safeFrame.minX + 12, trailingX - menuWidth)
+        let originY = min(anchorFrame.maxY + 6, safeFrame.maxY - menuHeight - 12)
+
+        let container = UIView(
+            frame: CGRect(
+                x: originX,
+                y: max(safeFrame.minY + 8, originY),
+                width: menuWidth,
+                height: menuHeight
+            )
+        )
+        container.alpha = 0
+        container.transform = CGAffineTransform(translationX: 0, y: -4)
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.24
+        container.layer.shadowRadius = 12
+        container.layer.shadowOffset = CGSize(width: 0, height: 6)
+        container.accessibilityViewIsModal = true
+
+        let contentView = UIView()
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.backgroundColor = UIColor(white: 0.08, alpha: 0.94)
+        contentView.layer.cornerRadius = 10
+        contentView.layer.masksToBounds = true
+        container.addSubview(contentView)
+
+        let stackView = UIStackView()
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.axis = .vertical
+        contentView.addSubview(stackView)
+
+        let actions: [() -> Void] = [
+            { [weak self] in self?.showBookDetails() },
+            { [weak self] in self?.showBookSearch() },
+            { [weak self] in self?.showContentFilters() },
+            { [weak self] in self?.showTapAreaSettings() }
+        ]
+        for index in menuTitles.indices {
+            addMoreMenuButton(
+                title: menuTitles[index],
+                rowHeight: rowHeight,
+                to: stackView,
+                action: actions[index]
+            )
+            if index < menuTitles.index(before: menuTitles.endIndex) {
+                let separator = UIView()
+                separator.backgroundColor = UIColor.white.withAlphaComponent(0.10)
+                stackView.addArrangedSubview(separator)
+                separator.heightAnchor.constraint(equalToConstant: separatorHeight).isActive = true
+            }
+        }
+
+        NSLayoutConstraint.activate([
+            contentView.topAnchor.constraint(equalTo: container.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+
+            stackView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+
+        view.addSubview(container)
+        moreMenuView = container
+        UIView.animate(withDuration: 0.16, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+            container.alpha = 1
+            container.transform = .identity
+        }
+    }
+
+    private func addMoreMenuButton(
+        title: String,
+        rowHeight: CGFloat,
+        to stackView: UIStackView,
+        action: @escaping () -> Void
+    ) {
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = title
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14)
+        configuration.baseForegroundColor = .white
+
+        let button = UIButton(configuration: configuration)
+        button.contentHorizontalAlignment = .leading
+        button.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        button.addAction(
+            UIAction { [weak self] _ in
+                self?.dismissMoreMenu(animated: true)
+                self?.setChromeVisible(false, animated: true)
+                action()
+            },
+            for: .touchUpInside
+        )
+        stackView.addArrangedSubview(button)
+        button.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
+    }
+
+    private func dismissMoreMenu(animated: Bool) {
+        guard let menuView = moreMenuView else {
+            return
+        }
+
+        moreMenuView = nil
+        let removeMenu = {
+            menuView.removeFromSuperview()
+        }
+
+        guard animated else {
+            removeMenu()
+            return
+        }
+
+        UIView.animate(withDuration: 0.12, delay: 0, options: [.beginFromCurrentState, .curveEaseIn]) {
+            menuView.alpha = 0
+            menuView.transform = CGAffineTransform(translationX: 0, y: -4)
+        } completion: { _ in
+            removeMenu()
+        }
     }
 
     private func showBookDetails() {
@@ -918,6 +1147,7 @@ final class ReaderViewController: UIViewController {
         isLoadingNextPage = false
         pages = []
         currentPage = nil
+        resetBookmarkState()
         applyPagesSnapshot()
         didReachEndOfBook = false
         pagingGeneration += 1
@@ -1254,6 +1484,7 @@ final class ReaderViewController: UIViewController {
     private func updateSessionState(isLoadingNextPage: Bool) {
         self.isLoadingNextPage = isLoadingNextPage
         updateChrome()
+        refreshBookmarkState()
     }
 
     @objc private func handleReaderTap(_ gesture: UITapGestureRecognizer) {
@@ -1263,6 +1494,11 @@ final class ReaderViewController: UIViewController {
 
         let location = viewportLocation(forViewLocation: gesture.location(in: view))
         updateCurrentPageFromVisiblePage()
+
+        if moreMenuView != nil {
+            dismissMoreMenu(animated: true)
+            return
+        }
 
         if isAutoReading {
             let centralHorizontalRange = collectionView.bounds.width * 0.25...collectionView.bounds.width * 0.75
@@ -1418,6 +1654,24 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
         collectionView.bounds.size
+    }
+}
+
+extension ReaderViewController: UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === navigationController?.interactivePopGestureRecognizer else {
+            return true
+        }
+        guard activeSettings.allowsSwipeBack,
+              !isChromeVisible,
+              !isAutoReading,
+              !isAutoReadPanelVisible,
+              (navigationController?.viewControllers.count ?? 0) > 1 else {
+            return false
+        }
+
+        let location = gestureRecognizer.location(in: view)
+        return location.x <= 24
     }
 }
 

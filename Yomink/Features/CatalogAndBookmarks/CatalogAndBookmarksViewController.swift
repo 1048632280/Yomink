@@ -113,6 +113,8 @@ final class CatalogAndBookmarksViewController: UIViewController {
             case .bookmark(let bookmark):
                 content.text = bookmark.title
                 content.secondaryText = "\u{4F4D}\u{7F6E} \(bookmark.byteOffset)"
+                content.image = UIImage(systemName: "bookmark.fill")
+                content.imageProperties.tintColor = YominkTheme.primaryText
                 cell.accessories = [.disclosureIndicator()]
             case .empty(let message):
                 content.text = message

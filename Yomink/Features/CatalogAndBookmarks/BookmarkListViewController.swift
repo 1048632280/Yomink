@@ -67,6 +67,8 @@ final class BookmarkListViewController: UIViewController {
             var content = UIListContentConfiguration.subtitleCell()
             content.text = bookmark.title
             content.secondaryText = "\u{4F4D}\u{7F6E} \(bookmark.byteOffset)"
+            content.image = UIImage(systemName: "bookmark.fill")
+            content.imageProperties.tintColor = YominkTheme.primaryText
             content.textProperties.color = YominkTheme.primaryText
             content.secondaryTextProperties.color = YominkTheme.secondaryText
             cell.contentConfiguration = content

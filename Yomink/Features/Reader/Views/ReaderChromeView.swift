@@ -24,7 +24,14 @@ final class ReaderChromeView: UIView {
     private let titleLabel = UILabel()
     private let progressLabel = UILabel()
     private let progressSlider = UISlider()
+    private let bookmarkButton = UIButton(type: .system)
+    private let moreButton = UIButton(type: .system)
     private var isDraggingProgress = false
+    private var isBookmarkActive = false
+    private var inactiveBookmarkTintColor: UIColor = .label
+    private let activeBookmarkTintColor = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .white : .black
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -54,6 +61,18 @@ final class ReaderChromeView: UIView {
             progressLabel.text = state.progressPercentText
             progressSlider.value = Float(Double(state.startByteOffset) / Double(max(1, state.fileSize)))
         }
+    }
+
+    func setBookmarkActive(_ isActive: Bool) {
+        isBookmarkActive = isActive
+        let symbolName = isActive ? "bookmark.fill" : "bookmark"
+        bookmarkButton.setImage(UIImage(systemName: symbolName), for: .normal)
+        bookmarkButton.accessibilityLabel = isActive ? "\u{5DF2}\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}" : "\u{6DFB}\u{52A0}\u{4E66}\u{7B7E}"
+        bookmarkButton.tintColor = isActive ? activeBookmarkTintColor : inactiveBookmarkTintColor
+    }
+
+    func moreButtonFrame(in view: UIView) -> CGRect {
+        moreButton.convert(moreButton.bounds, to: view)
     }
 
     func setVisible(_ isVisible: Bool, animated: Bool) {
@@ -89,8 +108,8 @@ final class ReaderChromeView: UIView {
         addSubview(topBar)
 
         let backButton = makeIconButton(systemName: "chevron.left", action: #selector(backTapped))
-        let bookmarkButton = makeIconButton(systemName: "bookmark", action: #selector(bookmarkTapped))
-        let moreButton = makeIconButton(systemName: "ellipsis", action: #selector(moreTapped))
+        configureIconButton(bookmarkButton, systemName: "bookmark", action: #selector(bookmarkTapped))
+        configureIconButton(moreButton, systemName: "ellipsis", action: #selector(moreTapped))
 
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.adjustsFontForContentSizeCategory = true
@@ -200,9 +219,14 @@ final class ReaderChromeView: UIView {
     private func makeIconButton(systemName: String, action: Selector) -> UIButton {
         let button = UIButton(type: .system)
         button.translatesAutoresizingMaskIntoConstraints = false
+        configureIconButton(button, systemName: systemName, action: action)
+        return button
+    }
+
+    private func configureIconButton(_ button: UIButton, systemName: String, action: Selector) {
+        button.translatesAutoresizingMaskIntoConstraints = false
         button.setImage(UIImage(systemName: systemName), for: .normal)
         button.addTarget(self, action: action, for: .touchUpInside)
-        return button
     }
 
     private func makeLabeledButton(title: String, systemName: String, action: Selector) -> UIButton {
@@ -233,6 +257,8 @@ final class ReaderChromeView: UIView {
         progressLabel.textColor = palette.secondaryText
         progressSlider.tintColor = palette.primaryText
         tintColor = palette.primaryText
+        inactiveBookmarkTintColor = palette.primaryText
+        bookmarkButton.tintColor = isBookmarkActive ? activeBookmarkTintColor : palette.primaryText
         quickActionContainer.arrangedSubviews.forEach { view in
             view.backgroundColor = palette.chromeBackground
         }

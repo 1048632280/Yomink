@@ -7,6 +7,7 @@ final class SettingsModelTests: XCTestCase {
         let settings = ReadingSettings.standard
 
         XCTAssertEqual(settings.theme, .paper)
+        XCTAssertFalse(settings.allowsSwipeBack)
         XCTAssertGreaterThan(settings.layout.fontSize, 0)
         XCTAssertGreaterThan(settings.layout.viewportSize.width, 0)
         XCTAssertGreaterThan(settings.layout.viewportSize.height, 0)
@@ -37,12 +38,14 @@ final class SettingsModelTests: XCTestCase {
         var settings = ReadingSettings.standard
         settings.theme = .black
         settings.layout.fontSize = 2
+        settings.allowsSwipeBack = true
 
         let store = ReadingSettingsStore(userDefaults: userDefaults)
         store.save(settings)
         let loaded = store.load()
 
         XCTAssertEqual(loaded.theme, .black)
+        XCTAssertTrue(loaded.allowsSwipeBack)
         XCTAssertEqual(loaded.layout.fontSize, CGFloat(ReadingSettings.fontSizeRange.lowerBound))
     }
 }

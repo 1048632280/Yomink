@@ -25,6 +25,12 @@ final class ReadingBookmarkService: @unchecked Sendable {
         }.value
     }
 
+    func bookmark(bookID: UUID, byteOffset: UInt64) async throws -> ReadingBookmark? {
+        try await Task.detached(priority: .utility) { [repository] in
+            try repository.fetchBookmark(bookID: bookID, byteOffset: byteOffset)
+        }.value
+    }
+
     func deleteBookmark(_ bookmark: ReadingBookmark) async throws {
         try await Task.detached(priority: .utility) { [repository] in
             try repository.deleteBookmark(id: bookmark.id, bookID: bookmark.bookID)
