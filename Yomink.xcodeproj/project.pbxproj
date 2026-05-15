@@ -56,6 +56,7 @@
 		200000472000004720000047 /* ReaderStatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000501000005010000050 /* ReaderStatusBarView.swift */; };
 		200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000511000005110000051 /* ReaderSettingsViewController.swift */; };
 		200000492000004920000049 /* ReadingThemePalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000521000005210000052 /* ReadingThemePalette.swift */; };
+		200000742000007420000074 /* AutoReadSpeedPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000771000007710000077 /* AutoReadSpeedPanelView.swift */; };
 		200000502000005020000050 /* ReadingBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000531000005310000053 /* ReadingBookmark.swift */; };
 		200000512000005120000051 /* BookmarkRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000541000005410000054 /* BookmarkRepository.swift */; };
 		200000522000005220000052 /* ReadingBookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000551000005510000055 /* ReadingBookmarkService.swift */; };
@@ -145,6 +146,7 @@
 		100000501000005010000050 /* ReaderStatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/ReaderStatusBarView.swift"; sourceTree = "<group>"; };
 		100000511000005110000051 /* ReaderSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReaderMenu/ReaderSettingsViewController.swift"; sourceTree = "<group>"; };
 		100000521000005210000052 /* ReadingThemePalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Themes/ReadingThemePalette.swift"; sourceTree = "<group>"; };
+		100000771000007710000077 /* AutoReadSpeedPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/AutoReadSpeedPanelView.swift"; sourceTree = "<group>"; };
 		100000531000005310000053 /* ReadingBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingBookmark.swift"; sourceTree = "<group>"; };
 		100000541000005410000054 /* BookmarkRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Repositories/BookmarkRepository.swift"; sourceTree = "<group>"; };
 		100000551000005510000055 /* ReadingBookmarkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingBookmarkService.swift"; sourceTree = "<group>"; };
@@ -265,6 +267,7 @@
 				100000421000004210000042 /* ReaderPageCell.swift */,
 				100000641000006410000064 /* ReaderChromeView.swift */,
 				100000501000005010000050 /* ReaderStatusBarView.swift */,
+				100000771000007710000077 /* AutoReadSpeedPanelView.swift */,
 				100000511000005110000051 /* ReaderSettingsViewController.swift */,
 				100000651000006510000065 /* BookSearchViewController.swift */,
 				100000761000007610000076 /* GroupManagementViewController.swift */,
@@ -454,6 +457,7 @@
 				200000392000003920000039 /* ReaderPageCell.swift in Sources */,
 				200000612000006120000061 /* ReaderChromeView.swift in Sources */,
 				200000472000004720000047 /* ReaderStatusBarView.swift in Sources */,
+				200000742000007420000074 /* AutoReadSpeedPanelView.swift in Sources */,
 				200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */,
 				200000622000006220000062 /* BookSearchViewController.swift in Sources */,
 				200000732000007320000073 /* GroupManagementViewController.swift in Sources */,

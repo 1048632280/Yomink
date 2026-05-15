@@ -9,6 +9,7 @@ final class ReaderChromeView: UIView {
         case nextChapter
         case catalog
         case settings
+        case autoRead
     }
 
     var onAction: ((Action) -> Void)?
@@ -139,9 +140,10 @@ final class ReaderChromeView: UIView {
         progressStack.alignment = .center
         progressStack.spacing = 12
 
+        let autoReadButton = makeLabeledButton(title: "\u{81EA}\u{52A8}", systemName: "play.circle", action: #selector(autoReadTapped))
         let catalogButton = makeLabeledButton(title: "\u{76EE}\u{5F55}", systemName: "list.bullet", action: #selector(catalogTapped))
         let settingsButton = makeLabeledButton(title: "\u{8BBE}\u{7F6E}", systemName: "textformat.size", action: #selector(settingsTapped))
-        let actionStack = UIStackView(arrangedSubviews: [catalogButton, settingsButton])
+        let actionStack = UIStackView(arrangedSubviews: [autoReadButton, catalogButton, settingsButton])
         actionStack.translatesAutoresizingMaskIntoConstraints = false
         actionStack.axis = .horizontal
         actionStack.alignment = .center
@@ -241,6 +243,10 @@ final class ReaderChromeView: UIView {
 
     @objc private func settingsTapped() {
         onAction?(.settings)
+    }
+
+    @objc private func autoReadTapped() {
+        onAction?(.autoRead)
     }
 
     @objc private func backgroundTapped(_ gesture: UITapGestureRecognizer) {
