@@ -115,8 +115,10 @@ final class ReaderViewController: UIViewController {
     }
 
     deinit {
-        UIApplication.shared.isIdleTimerDisabled = false
-        UIDevice.current.isBatteryMonitoringEnabled = false
+        Task { @MainActor in
+            UIApplication.shared.isIdleTimerDisabled = false
+            UIDevice.current.isBatteryMonitoringEnabled = false
+        }
         openingTask?.cancel()
         previousPageTask?.cancel()
         nextPageTask?.cancel()
