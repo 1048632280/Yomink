@@ -67,6 +67,7 @@
 		200000582000005820000058 /* CatalogAndBookmarksViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000611000006110000061 /* CatalogAndBookmarksViewController.swift */; };
 		200000592000005920000059 /* ChapterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000621000006210000062 /* ChapterParserTests.swift */; };
 		200000602000006020000060 /* ChapterRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000631000006310000063 /* ChapterRepositoryTests.swift */; };
+		200000612000006120000061 /* ReaderChromeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000641000006410000064 /* ReaderChromeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -143,6 +144,7 @@
 		100000611000006110000061 /* CatalogAndBookmarksViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/CatalogAndBookmarks/CatalogAndBookmarksViewController.swift"; sourceTree = "<group>"; };
 		100000621000006210000062 /* ChapterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ChapterParserTests.swift"; sourceTree = "<group>"; };
 		100000631000006310000063 /* ChapterRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/ChapterRepositoryTests.swift"; sourceTree = "<group>"; };
+		100000641000006410000064 /* ReaderChromeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/ReaderChromeView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -228,6 +230,7 @@
 				100000251000002510000025 /* ImportCoordinator.swift */,
 				100000261000002610000026 /* ReaderViewController.swift */,
 				100000421000004210000042 /* ReaderPageCell.swift */,
+				100000641000006410000064 /* ReaderChromeView.swift */,
 				100000501000005010000050 /* ReaderStatusBarView.swift */,
 				100000511000005110000051 /* ReaderSettingsViewController.swift */,
 				100000561000005610000056 /* BookmarkListViewController.swift */,
@@ -404,6 +407,7 @@
 				200000252000002520000025 /* ImportCoordinator.swift in Sources */,
 				200000262000002620000026 /* ReaderViewController.swift in Sources */,
 				200000392000003920000039 /* ReaderPageCell.swift in Sources */,
+				200000612000006120000061 /* ReaderChromeView.swift in Sources */,
 				200000472000004720000047 /* ReaderStatusBarView.swift in Sources */,
 				200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */,
 				200000532000005320000053 /* BookmarkListViewController.swift in Sources */,

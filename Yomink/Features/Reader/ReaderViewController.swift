@@ -13,15 +13,18 @@ final class ReaderViewController: UIViewController {
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
-    private let statusBarView = ReaderStatusBarView()
+    private let chromeView = ReaderChromeView()
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, ReaderPage>?
     private var pages: [ReaderPage] = []
     private var currentPage: ReaderPage?
+    private var chapters: [ReadingChapter] = []
     private var openingTask: Task<Void, Never>?
     private var nextPageTask: Task<Void, Never>?
+    private var chapterRefreshTask: Task<Void, Never>?
     private var didStartOpening = false
     private var didReachEndOfBook = false
+    private var isChromeVisible = false
     private var activeSettings = ReadingSettings.standard
     private var pagingGeneration = 0
     private let maximumResidentPages = 12
@@ -59,17 +62,22 @@ final class ReaderViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = book.title
-        configureNavigationItems()
         applyTheme(activeSettings.theme)
         configureCollectionView()
-        configureStatusBar()
         configureDataSource()
+        configureChrome()
+        configureGestures()
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(saveCurrentProgressForBackground),
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationController?.setNavigationBarHidden(true, animated: animated)
     }
 
     override func didReceiveMemoryWarning() {
@@ -87,11 +95,15 @@ final class ReaderViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         saveCurrentProgress()
+        if isMovingFromParent || navigationController?.isBeingDismissed == true {
+            navigationController?.setNavigationBarHidden(false, animated: animated)
+        }
     }
 
     deinit {
         openingTask?.cancel()
         nextPageTask?.cancel()
+        chapterRefreshTask?.cancel()
         chapterService.cancelParsing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
     }
@@ -113,40 +125,6 @@ final class ReaderViewController: UIViewController {
         ])
     }
 
-    private func configureNavigationItems() {
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(
-                image: UIImage(systemName: "textformat.size"),
-                style: .plain,
-                target: self,
-                action: #selector(showReadingSettings)
-            ),
-            UIBarButtonItem(
-                image: UIImage(systemName: "bookmark"),
-                style: .plain,
-                target: self,
-                action: #selector(addBookmark)
-            ),
-            UIBarButtonItem(
-                image: UIImage(systemName: "list.bullet"),
-                style: .plain,
-                target: self,
-                action: #selector(showCatalogAndBookmarks)
-            )
-        ]
-    }
-
-    private func configureStatusBar() {
-        statusBarView.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(statusBarView)
-        NSLayoutConstraint.activate([
-            statusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            statusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            statusBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            statusBarView.heightAnchor.constraint(equalToConstant: 28)
-        ])
-    }
-
     private func configureDataSource() {
         dataSource = UICollectionViewDiffableDataSource<Section, ReaderPage>(
             collectionView: collectionView
@@ -163,14 +141,45 @@ final class ReaderViewController: UIViewController {
         }
     }
 
+    private func configureChrome() {
+        view.addSubview(chromeView)
+        NSLayoutConstraint.activate([
+            chromeView.topAnchor.constraint(equalTo: view.topAnchor),
+            chromeView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            chromeView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            chromeView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+
+        chromeView.onAction = { [weak self] action in
+            self?.handleChromeAction(action)
+        }
+        chromeView.onBackgroundTap = { [weak self] in
+            self?.setChromeVisible(false, animated: true)
+        }
+        chromeView.onProgressPreview = { [weak self] progress in
+            self?.progressPreviewText(for: progress)
+        }
+        chromeView.onProgressCommit = { [weak self] progress in
+            self?.jumpToProgress(progress)
+        }
+        updateChrome()
+    }
+
+    private func configureGestures() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleReaderTap(_:)))
+        tapGesture.cancelsTouchesInView = false
+        collectionView.addGestureRecognizer(tapGesture)
+    }
+
     private func applyTheme(_ theme: ReadingTheme) {
         let palette = ReadingThemePalette.palette(for: theme)
         view.backgroundColor = palette.background
         collectionView.backgroundColor = palette.background
-        statusBarView.applyTheme(theme)
+        chromeView.configure(title: book.title, state: currentSessionState(), theme: theme)
     }
 
     @objc private func showReadingSettings() {
+        setChromeVisible(false, animated: true)
         updateCurrentPageFromVisiblePage()
         var settings = activeSettings
         settings.layout.viewportSize = collectionView.bounds.size
@@ -219,6 +228,7 @@ final class ReaderViewController: UIViewController {
     }
 
     @objc private func showCatalogAndBookmarks() {
+        setChromeVisible(false, animated: true)
         Task { [weak self] in
             guard let self else {
                 return
@@ -226,6 +236,7 @@ final class ReaderViewController: UIViewController {
 
             do {
                 let chapters = try await chapterService.chapters(bookID: book.id)
+                self.chapters = chapters
                 let bookmarks = try await bookmarkService.bookmarks(bookID: book.id)
                 presentCatalogAndBookmarks(chapters: chapters, bookmarks: bookmarks)
             } catch {
@@ -273,6 +284,143 @@ final class ReaderViewController: UIViewController {
         progressStore.flushPendingProgress()
         pagingService.removeCachedPages()
         openPage(preferredByteOffset: byteOffset)
+    }
+
+    private func handleChromeAction(_ action: ReaderChromeView.Action) {
+        switch action {
+        case .back:
+            navigationController?.popViewController(animated: true)
+        case .bookmark:
+            addBookmark()
+        case .more:
+            showMorePlaceholder()
+        case .previousChapter:
+            jumpToAdjacentChapter(direction: -1)
+        case .nextChapter:
+            jumpToAdjacentChapter(direction: 1)
+        case .catalog:
+            showCatalogAndBookmarks()
+        case .settings:
+            showReadingSettings()
+        }
+    }
+
+    private func setChromeVisible(_ isVisible: Bool, animated: Bool) {
+        isChromeVisible = isVisible
+        updateChrome()
+        chromeView.setVisible(isVisible, animated: animated)
+    }
+
+    private func updateChrome() {
+        chromeView.configure(
+            title: book.title,
+            state: currentSessionState(),
+            theme: activeSettings.theme
+        )
+    }
+
+    private func currentSessionState() -> ReaderSessionState? {
+        guard let currentPage else {
+            return nil
+        }
+
+        return ReaderSessionState(
+            bookID: currentPage.bookID,
+            currentPageIndex: currentPage.pageIndex,
+            residentPageCount: pages.count,
+            startByteOffset: currentPage.startByteOffset,
+            endByteOffset: currentPage.endByteOffset,
+            fileSize: book.fileSize,
+            isLoadingNextPage: nextPageTask != nil,
+            didReachEndOfBook: didReachEndOfBook
+        )
+    }
+
+    private func progressPreviewText(for progress: Float) -> String {
+        let clampedProgress = min(1, max(0, progress))
+        let byteOffset = UInt64(clampedProgress * Float(book.fileSize))
+        let percentText = NumberFormatter.localizedString(
+            from: NSNumber(value: clampedProgress),
+            number: .percent
+        )
+        guard let chapter = nearestChapter(atOrBefore: byteOffset) else {
+            return percentText
+        }
+        return "\(chapter.title) \(percentText)"
+    }
+
+    private func jumpToProgress(_ progress: Float) {
+        let clampedProgress = min(1, max(0, progress))
+        let byteOffset = min(book.lastReadableByteOffset, UInt64(clampedProgress * Float(book.fileSize)))
+        jumpToByteOffset(byteOffset)
+    }
+
+    private func jumpToAdjacentChapter(direction: Int) {
+        updateCurrentPageFromVisiblePage()
+        guard let currentPage else {
+            return
+        }
+
+        if chapters.isEmpty {
+            refreshChapters()
+            showTransientNotice(title: "\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{4E2D}")
+            return
+        }
+
+        let targetChapter: ReadingChapter?
+        if direction < 0 {
+            targetChapter = chapters.last { $0.byteOffset < currentPage.startByteOffset }
+        } else {
+            targetChapter = chapters.first { $0.byteOffset > currentPage.startByteOffset }
+        }
+
+        guard let targetChapter else {
+            showTransientNotice(title: direction < 0 ? "\u{5DF2}\u{662F}\u{7B2C}\u{4E00}\u{7AE0}" : "\u{5DF2}\u{662F}\u{6700}\u{540E}\u{4E00}\u{7AE0}")
+            return
+        }
+        jumpToChapter(targetChapter)
+    }
+
+    private func nearestChapter(atOrBefore byteOffset: UInt64) -> ReadingChapter? {
+        chapters.last { $0.byteOffset <= byteOffset }
+    }
+
+    private func refreshChapters() {
+        chapterRefreshTask?.cancel()
+        chapterRefreshTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                chapters = try await chapterService.chapters(bookID: book.id)
+            } catch {
+                chapters = []
+            }
+            chapterRefreshTask = nil
+            updateChrome()
+        }
+    }
+
+    private func showMorePlaceholder() {
+        setChromeVisible(false, animated: true)
+        let alert = UIAlertController(
+            title: "\u{66F4}\u{591A}",
+            message: "\u{4E66}\u{7C4D}\u{8BE6}\u{60C5}\u{3001}\u{5185}\u{5BB9}\u{641C}\u{7D22}\u{548C}\u{8FC7}\u{6EE4}\u{5C06}\u{5728}\u{540E}\u{7EED}\u{9636}\u{6BB5}\u{63A5}\u{5165}\u{3002}",
+            preferredStyle: .actionSheet
+        )
+        alert.addAction(UIAlertAction(title: "\u{597D}", style: .cancel))
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(
+                x: view.bounds.midX,
+                y: view.bounds.maxY - 1,
+                width: 1,
+                height: 1
+            )
+            popover.permittedArrowDirections = []
+        }
+        present(alert, animated: true)
     }
 
     private func refreshVisibleCellsForActiveSettings() {
@@ -346,6 +494,7 @@ final class ReaderViewController: UIViewController {
         refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: false)
         chapterService.scheduleParsing(bookID: book.id)
+        refreshChapters()
     }
 
     private func appendPage(_ page: ReaderPage) {
@@ -501,22 +650,25 @@ final class ReaderViewController: UIViewController {
     }
 
     private func updateSessionState(isLoadingNextPage: Bool) {
-        guard let currentPage else {
+        _ = isLoadingNextPage
+        updateChrome()
+    }
+
+    @objc private func handleReaderTap(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended else {
             return
         }
 
-        statusBarView.configure(
-            state: ReaderSessionState(
-                bookID: currentPage.bookID,
-                currentPageIndex: currentPage.pageIndex,
-                residentPageCount: pages.count,
-                startByteOffset: currentPage.startByteOffset,
-                endByteOffset: currentPage.endByteOffset,
-                fileSize: book.fileSize,
-                isLoadingNextPage: isLoadingNextPage,
-                didReachEndOfBook: didReachEndOfBook
-            )
-        )
+        let location = gesture.location(in: collectionView)
+        let centralHorizontalRange = collectionView.bounds.width * 0.25...collectionView.bounds.width * 0.75
+        let centralVerticalRange = collectionView.bounds.height * 0.20...collectionView.bounds.height * 0.80
+        guard centralHorizontalRange.contains(location.x),
+              centralVerticalRange.contains(location.y) else {
+            return
+        }
+
+        updateCurrentPageFromVisiblePage()
+        setChromeVisible(!isChromeVisible, animated: true)
     }
 
     private func showTransientNotice(title: String) {
@@ -562,5 +714,11 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
         collectionView.bounds.size
+    }
+}
+
+private extension UInt64 {
+    var lastReadableByteOffset: UInt64 {
+        self > 0 ? self - 1 : 0
     }
 }
