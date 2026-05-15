@@ -48,4 +48,19 @@ final class SettingsModelTests: XCTestCase {
         XCTAssertTrue(loaded.allowsSwipeBack)
         XCTAssertEqual(loaded.layout.fontSize, CGFloat(ReadingSettings.fontSizeRange.lowerBound))
     }
+
+    func testAppSettingsStoreSavesBookshelfDisplayMode() {
+        let suiteName = "YominkTests.AppSettings.\(UUID().uuidString)"
+        let userDefaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = AppSettingsStore(userDefaults: userDefaults)
+        XCTAssertEqual(store.bookshelfDisplayMode, .list)
+
+        store.bookshelfDisplayMode = .grid
+
+        XCTAssertEqual(store.bookshelfDisplayMode, .grid)
+    }
 }

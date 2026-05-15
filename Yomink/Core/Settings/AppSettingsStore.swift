@@ -14,6 +14,20 @@ enum BookshelfSortMode: String, Codable, CaseIterable {
     }
 }
 
+enum BookshelfDisplayMode: String, Codable, CaseIterable {
+    case list
+    case grid
+
+    var title: String {
+        switch self {
+        case .list:
+            return "\u{5217}\u{8868}"
+        case .grid:
+            return "\u{7F51}\u{683C}"
+        }
+    }
+}
+
 final class AppSettingsStore {
     private let userDefaults: UserDefaults
     private let maximumSearchHistoryCount = 12
@@ -32,6 +46,19 @@ final class AppSettingsStore {
         }
         set {
             userDefaults.set(newValue.rawValue, forKey: "bookshelfSortMode")
+        }
+    }
+
+    var bookshelfDisplayMode: BookshelfDisplayMode {
+        get {
+            guard let rawValue = userDefaults.string(forKey: "bookshelfDisplayMode"),
+                  let mode = BookshelfDisplayMode(rawValue: rawValue) else {
+                return .list
+            }
+            return mode
+        }
+        set {
+            userDefaults.set(newValue.rawValue, forKey: "bookshelfDisplayMode")
         }
     }
 

@@ -16,6 +16,7 @@ final class BookshelfViewController: UIViewController {
     private var groupList = BookGroupList(totalBookCount: 0, ungroupedBookCount: 0, groups: [])
     private var selectedBookIDs: Set<UUID> = []
     private var isSelectingBooks = false
+    private var displayMode: BookshelfDisplayMode
     private let selectionMenuContainer = UIView()
     private let selectionMenuStack = UIStackView()
     private let deleteSelectionButton = UIButton(type: .system)
@@ -25,13 +26,10 @@ final class BookshelfViewController: UIViewController {
 
     private lazy var collectionView: UICollectionView = {
         let backgroundColor = YominkTheme.background
-        let layout = UICollectionViewCompositionalLayout { _, layoutEnvironment in
-            var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
-            configuration.backgroundColor = backgroundColor
-            configuration.showsSeparators = false
-            return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: layoutEnvironment)
-        }
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        let collectionView = UICollectionView(
+            frame: .zero,
+            collectionViewLayout: Self.makeCollectionLayout(displayMode: displayMode)
+        )
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.backgroundColor = backgroundColor
         return collectionView
@@ -39,6 +37,7 @@ final class BookshelfViewController: UIViewController {
 
     init(viewModel: BookshelfViewModel) {
         self.viewModel = viewModel
+        self.displayMode = viewModel.currentDisplayMode
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -59,6 +58,7 @@ final class BookshelfViewController: UIViewController {
     }
 
     func refreshBooks() {
+        applyDisplayModeIfNeeded(animated: false)
         viewModel.refresh()
     }
 
@@ -85,6 +85,43 @@ final class BookshelfViewController: UIViewController {
         ]
     }
 
+    private static func makeCollectionLayout(displayMode: BookshelfDisplayMode) -> UICollectionViewLayout {
+        switch displayMode {
+        case .list:
+            return UICollectionViewCompositionalLayout { _, layoutEnvironment in
+                var configuration = UICollectionLayoutListConfiguration(appearance: .plain)
+                configuration.backgroundColor = YominkTheme.background
+                configuration.showsSeparators = false
+                return NSCollectionLayoutSection.list(using: configuration, layoutEnvironment: layoutEnvironment)
+            }
+        case .grid:
+            return UICollectionViewCompositionalLayout { _, layoutEnvironment in
+                let availableWidth = layoutEnvironment.container.effectiveContentSize.width
+                let columnCount = min(3, max(1, Int(availableWidth / 118)))
+                let itemSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1),
+                    heightDimension: .fractionalHeight(1)
+                )
+                let item = NSCollectionLayoutItem(layoutSize: itemSize)
+                item.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
+
+                let groupSize = NSCollectionLayoutSize(
+                    widthDimension: .fractionalWidth(1),
+                    heightDimension: .absolute(150)
+                )
+                let group = NSCollectionLayoutGroup.horizontal(
+                    layoutSize: groupSize,
+                    subitem: item,
+                    count: columnCount
+                )
+
+                let section = NSCollectionLayoutSection(group: group)
+                section.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12)
+                return section
+            }
+        }
+    }
+
     private func configureCollectionView() {
         view.addSubview(collectionView)
         collectionView.delegate = self
@@ -95,48 +132,114 @@ final class BookshelfViewController: UIViewController {
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
 
-        let registration = UICollectionView.CellRegistration<UICollectionViewListCell, BookshelfViewModel.Item> {
+        let listRegistration = UICollectionView.CellRegistration<UICollectionViewListCell, BookshelfViewModel.Item> {
             [weak self] cell, _, item in
             guard let self else {
                 return
             }
+            var content = makeCellContent(for: item, isGrid: false)
+            configureSelectableImageIfNeeded(for: item, content: &content)
 
-            var content = UIListContentConfiguration.subtitleCell()
-            content.textProperties.color = YominkTheme.primaryText
-            content.secondaryTextProperties.color = YominkTheme.secondaryText
-
+            cell.accessories = []
             switch item {
             case .book(let bookItem):
-                content.text = bookItem.book.title
-                content.secondaryText = Self.subtitle(for: bookItem)
-                if isSelectingBooks {
-                    let isSelected = selectedBookIDs.contains(bookItem.book.id)
-                    content.image = UIImage(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    content.imageProperties.tintColor = isSelected ? view.tintColor : YominkTheme.secondaryText
-                    cell.accessories = []
-                } else {
-                    content.image = UIImage(systemName: "book.closed")
+                if !isSelectingBooks {
                     cell.accessories = [.disclosureIndicator()]
                 }
             case .emptyState:
-                content.text = "\u{5C1A}\u{672A}\u{5BFC}\u{5165}\u{4E66}\u{7C4D}"
-                content.secondaryText = "\u{4ECE}\u{53F3}\u{4E0A}\u{89D2}\u{6DFB}\u{52A0} TXT \u{6587}\u{4EF6}\u{5F00}\u{59CB}\u{9605}\u{8BFB}"
-                content.image = UIImage(systemName: "tray")
-                cell.accessories = []
+                break
             }
 
             cell.contentConfiguration = content
             cell.backgroundConfiguration = UIBackgroundConfiguration.clear()
         }
 
+        let gridRegistration = UICollectionView.CellRegistration<UICollectionViewCell, BookshelfViewModel.Item> {
+            [weak self] cell, _, item in
+            guard let self else {
+                return
+            }
+
+            var content = makeCellContent(for: item, isGrid: true)
+            configureSelectableImageIfNeeded(for: item, content: &content)
+            cell.contentConfiguration = content
+
+            var backgroundConfiguration = UIBackgroundConfiguration.clear()
+            if case .book = item {
+                backgroundConfiguration.backgroundColor = .secondarySystemBackground
+                backgroundConfiguration.cornerRadius = 8
+            }
+            cell.backgroundConfiguration = backgroundConfiguration
+        }
+
         dataSource = UICollectionViewDiffableDataSource<Section, BookshelfViewModel.Item>(
             collectionView: collectionView
-        ) { collectionView, indexPath, item in
-            collectionView.dequeueConfiguredReusableCell(using: registration, for: indexPath, item: item)
+        ) { [weak self] collectionView, indexPath, item in
+            guard let self else {
+                return UICollectionViewCell()
+            }
+
+            switch displayMode {
+            case .list:
+                return collectionView.dequeueConfiguredReusableCell(
+                    using: listRegistration,
+                    for: indexPath,
+                    item: item
+                )
+            case .grid:
+                return collectionView.dequeueConfiguredReusableCell(
+                    using: gridRegistration,
+                    for: indexPath,
+                    item: item
+                )
+            }
         }
 
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         collectionView.addGestureRecognizer(longPressGesture)
+    }
+
+    private func makeCellContent(
+        for item: BookshelfViewModel.Item,
+        isGrid: Bool
+    ) -> UIListContentConfiguration {
+        var content = UIListContentConfiguration.subtitleCell()
+        content.textProperties.color = YominkTheme.primaryText
+        content.secondaryTextProperties.color = YominkTheme.secondaryText
+        content.textProperties.numberOfLines = isGrid ? 2 : 1
+        content.secondaryTextProperties.numberOfLines = isGrid ? 2 : 1
+
+        if isGrid {
+            content.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8)
+            content.imageProperties.maximumSize = CGSize(width: 28, height: 28)
+        }
+
+        switch item {
+        case .book(let bookItem):
+            content.text = bookItem.book.title
+            content.secondaryText = Self.subtitle(for: bookItem)
+            content.image = UIImage(systemName: "book.closed")
+        case .emptyState:
+            content.text = "\u{5C1A}\u{672A}\u{5BFC}\u{5165}\u{4E66}\u{7C4D}"
+            content.secondaryText = "\u{4ECE}\u{53F3}\u{4E0A}\u{89D2}\u{6DFB}\u{52A0} TXT \u{6587}\u{4EF6}\u{5F00}\u{59CB}\u{9605}\u{8BFB}"
+            content.image = UIImage(systemName: "tray")
+        }
+
+        return content
+    }
+
+    private func configureSelectableImageIfNeeded(
+        for item: BookshelfViewModel.Item,
+        content: inout UIListContentConfiguration
+    ) {
+        guard isSelectingBooks,
+              case .book(let bookItem) = item else {
+            return
+        }
+
+        let isSelected = selectedBookIDs.contains(bookItem.book.id)
+        content.image = UIImage(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+        content.imageProperties.tintColor = isSelected ? view.tintColor : YominkTheme.secondaryText
     }
 
     private func configureSelectionMenu() {
@@ -244,11 +347,36 @@ final class BookshelfViewController: UIViewController {
     }
 
     private func handleItemsChanged(_ items: [BookshelfViewModel.Item]) {
+        applyDisplayModeIfNeeded(animated: false)
         if isSelectingBooks {
             selectedBookIDs.formIntersection(Set(bookIDs(in: items)))
         }
         applySnapshot(items: items)
         updateSelectionMenuState()
+    }
+
+    private func applyDisplayModeIfNeeded(animated: Bool) {
+        let updatedDisplayMode = viewModel.currentDisplayMode
+        guard displayMode != updatedDisplayMode else {
+            return
+        }
+
+        displayMode = updatedDisplayMode
+        collectionView.setCollectionViewLayout(
+            Self.makeCollectionLayout(displayMode: updatedDisplayMode),
+            animated: animated
+        )
+        reloadSnapshotForDisplayModeChange()
+    }
+
+    private func reloadSnapshotForDisplayModeChange() {
+        guard var snapshot = dataSource?.snapshot(),
+              !snapshot.itemIdentifiers.isEmpty else {
+            return
+        }
+
+        snapshot.reloadItems(snapshot.itemIdentifiers)
+        dataSource?.apply(snapshot, animatingDifferences: false)
     }
 
     @objc private func showGroups() {

@@ -62,6 +62,10 @@ final class BookshelfViewModel {
         refresh()
     }
 
+    func setDisplayMode(_ displayMode: BookshelfDisplayMode) {
+        appSettingsStore.bookshelfDisplayMode = displayMode
+    }
+
     func createGroup(name: String) throws {
         _ = try groupRepository.createGroup(name: name)
         refresh()
@@ -103,6 +107,10 @@ final class BookshelfViewModel {
 
     var currentSortMode: BookshelfSortMode {
         appSettingsStore.bookshelfSortMode
+    }
+
+    var currentDisplayMode: BookshelfDisplayMode {
+        appSettingsStore.bookshelfDisplayMode
     }
 
     var currentGroupFilter: BookshelfGroupFilter {

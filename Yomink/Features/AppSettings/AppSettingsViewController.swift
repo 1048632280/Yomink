@@ -5,6 +5,7 @@ final class AppSettingsViewController: UIViewController {
 
     private let appSettingsStore: AppSettingsStore
     private let sortControl = UISegmentedControl(items: BookshelfSortMode.allCases.map(\.title))
+    private let displayModeControl = UISegmentedControl(items: BookshelfDisplayMode.allCases.map(\.title))
 
     init(appSettingsStore: AppSettingsStore) {
         self.appSettingsStore = appSettingsStore
@@ -26,14 +27,17 @@ final class AppSettingsViewController: UIViewController {
 
     private func configureLayout() {
         sortControl.addTarget(self, action: #selector(sortModeChanged), for: .valueChanged)
+        displayModeControl.addTarget(self, action: #selector(displayModeChanged), for: .valueChanged)
 
-        let titleLabel = UILabel()
-        titleLabel.text = "\u{4E66}\u{67B6}\u{6392}\u{5E8F}"
-        titleLabel.font = .preferredFont(forTextStyle: .headline)
-        titleLabel.textColor = YominkTheme.primaryText
-        titleLabel.adjustsFontForContentSizeCategory = true
+        let sortTitleLabel = makeSectionTitleLabel(text: "\u{4E66}\u{67B6}\u{6392}\u{5E8F}")
+        let displayTitleLabel = makeSectionTitleLabel(text: "\u{4E66}\u{67B6}\u{5C55}\u{793A}")
 
-        let stackView = UIStackView(arrangedSubviews: [titleLabel, sortControl])
+        let stackView = UIStackView(arrangedSubviews: [
+            sortTitleLabel,
+            sortControl,
+            displayTitleLabel,
+            displayModeControl
+        ])
         stackView.translatesAutoresizingMaskIntoConstraints = false
         stackView.axis = .vertical
         stackView.spacing = 14
@@ -48,13 +52,29 @@ final class AppSettingsViewController: UIViewController {
         ])
     }
 
+    private func makeSectionTitleLabel(text: String) -> UILabel {
+        let label = UILabel()
+        label.text = text
+        label.font = .preferredFont(forTextStyle: .headline)
+        label.textColor = YominkTheme.primaryText
+        label.adjustsFontForContentSizeCategory = true
+        return label
+    }
+
     private func refreshControls() {
         sortControl.selectedSegmentIndex = BookshelfSortMode.allCases.firstIndex(of: appSettingsStore.bookshelfSortMode) ?? 0
+        displayModeControl.selectedSegmentIndex = BookshelfDisplayMode.allCases.firstIndex(of: appSettingsStore.bookshelfDisplayMode) ?? 0
     }
 
     @objc private func sortModeChanged() {
         let index = max(0, sortControl.selectedSegmentIndex)
         appSettingsStore.bookshelfSortMode = BookshelfSortMode.allCases[index]
+        onSettingsChanged?()
+    }
+
+    @objc private func displayModeChanged() {
+        let index = max(0, displayModeControl.selectedSegmentIndex)
+        appSettingsStore.bookshelfDisplayMode = BookshelfDisplayMode.allCases[index]
         onSettingsChanged?()
     }
 }
