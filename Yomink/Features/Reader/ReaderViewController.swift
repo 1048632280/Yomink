@@ -157,7 +157,7 @@ final class ReaderViewController: UIViewController {
             self?.setChromeVisible(false, animated: true)
         }
         chromeView.onProgressPreview = { [weak self] progress in
-            self?.progressPreviewText(for: progress)
+            self?.progressPreviewText(for: progress) ?? "0.0%"
         }
         chromeView.onProgressCommit = { [weak self] progress in
             self?.jumpToProgress(progress)
@@ -351,7 +351,7 @@ final class ReaderViewController: UIViewController {
 
     private func jumpToProgress(_ progress: Float) {
         let clampedProgress = min(1, max(0, progress))
-        let byteOffset = min(book.lastReadableByteOffset, UInt64(clampedProgress * Float(book.fileSize)))
+        let byteOffset = min(book.fileSize.lastReadableByteOffset, UInt64(clampedProgress * Float(book.fileSize)))
         jumpToByteOffset(byteOffset)
     }
 
