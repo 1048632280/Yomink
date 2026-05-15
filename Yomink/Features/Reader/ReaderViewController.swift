@@ -166,7 +166,6 @@ final class ReaderViewController: UIViewController {
         chapterRefreshTask?.cancel()
         bookmarkStateTask?.cancel()
         backgroundWorkResumeTask?.cancel()
-        restoreSwipeBackGesture()
         chapterService.cancelParsing(bookID: book.id)
         searchIndexService.cancelIndexing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
@@ -717,13 +716,13 @@ final class ReaderViewController: UIViewController {
             do {
                 let bookmark = try await bookmarkService.bookmark(bookID: book.id, byteOffset: byteOffset)
                 guard !Task.isCancelled,
-                      currentPage?.startByteOffset == byteOffset else {
+                      self.currentPage?.startByteOffset == byteOffset else {
                     return
                 }
                 isCurrentPageBookmarked = bookmark != nil
                 chromeView.setBookmarkActive(bookmark != nil)
             } catch {
-                guard currentPage?.startByteOffset == byteOffset else {
+                guard self.currentPage?.startByteOffset == byteOffset else {
                     return
                 }
                 isCurrentPageBookmarked = false
