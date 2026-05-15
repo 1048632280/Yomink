@@ -101,20 +101,10 @@ private final class CoreTextPageView: UIView {
         )
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
         let path = CGMutablePath()
-        path.addRect(textRect)
+        path.addRect(settings.layout.contentRect(in: bounds))
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
         CTFrameDraw(frame, context)
         context.restoreGState()
-    }
-
-    private var textRect: CGRect {
-        let layout = settings.layout
-        return CGRect(
-            x: layout.contentInsets.left,
-            y: layout.contentInsets.bottom,
-            width: max(1, bounds.width - layout.contentInsets.left - layout.contentInsets.right),
-            height: max(1, bounds.height - layout.contentInsets.top - layout.contentInsets.bottom)
-        )
     }
 
     private func makeParagraphStyle() -> CTParagraphStyle {

@@ -71,11 +71,8 @@ struct CoreTextPaginator {
         )
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
         let path = CGMutablePath()
-        let textRect = CGRect(
-            x: layout.contentInsets.left,
-            y: layout.contentInsets.top,
-            width: max(1, layout.viewportSize.width - layout.contentInsets.left - layout.contentInsets.right),
-            height: max(1, layout.viewportSize.height - layout.contentInsets.top - layout.contentInsets.bottom)
+        let textRect = layout.contentRect(
+            in: CGRect(origin: .zero, size: layout.viewportSize)
         )
         path.addRect(textRect)
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)

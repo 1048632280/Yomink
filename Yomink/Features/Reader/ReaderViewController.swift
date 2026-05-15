@@ -160,6 +160,9 @@ final class ReaderViewController: UIViewController {
         collectionView.isPagingEnabled = true
         collectionView.showsHorizontalScrollIndicator = false
         collectionView.showsVerticalScrollIndicator = false
+        collectionView.contentInsetAdjustmentBehavior = .never
+        collectionView.contentInset = .zero
+        collectionView.scrollIndicatorInsets = .zero
         collectionView.delegate = self
         collectionView.register(ReaderPageCell.self, forCellWithReuseIdentifier: ReaderPageCell.reuseIdentifier)
 
