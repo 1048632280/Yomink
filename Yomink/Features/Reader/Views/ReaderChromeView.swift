@@ -129,8 +129,8 @@ final class ReaderChromeView: UIView {
             topBar.trailingAnchor.constraint(equalTo: trailingAnchor),
 
             stackView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 8),
-            stackView.leadingAnchor.constraint(equalTo: topBar.leadingAnchor, constant: 12),
-            stackView.trailingAnchor.constraint(equalTo: topBar.trailingAnchor, constant: -12),
+            stackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 12),
+            stackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -12),
             stackView.bottomAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -8),
 
             backButton.widthAnchor.constraint(equalToConstant: 44),
@@ -183,8 +183,8 @@ final class ReaderChromeView: UIView {
             bottomBar.bottomAnchor.constraint(equalTo: bottomAnchor),
 
             stackView.topAnchor.constraint(equalTo: bottomBar.topAnchor, constant: 12),
-            stackView.leadingAnchor.constraint(equalTo: bottomBar.leadingAnchor, constant: 20),
-            stackView.trailingAnchor.constraint(equalTo: bottomBar.trailingAnchor, constant: -20),
+            stackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
+            stackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
             stackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -10),
 
             previousButton.widthAnchor.constraint(equalToConstant: 44),
@@ -207,7 +207,7 @@ final class ReaderChromeView: UIView {
         quickActionContainer.addArrangedSubview(darkModeButton)
 
         NSLayoutConstraint.activate([
-            quickActionContainer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            quickActionContainer.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -18),
             quickActionContainer.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -14),
             autoReadButton.widthAnchor.constraint(equalToConstant: 46),
             autoReadButton.heightAnchor.constraint(equalToConstant: 46),

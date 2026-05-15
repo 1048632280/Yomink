@@ -55,6 +55,7 @@ final class ReaderViewController: UIViewController {
     private var previousInteractivePopGestureWasEnabled = true
     private var didCaptureInteractivePopGestureState = false
     private let maximumResidentPages = 12
+    private var lastPaginationMetrics: ReaderViewportMetrics?
     private var usesVerticalScrolling: Bool {
         isAutoReading || activeSettings.pageTurnMode == .verticalScroll
     }
@@ -147,6 +148,12 @@ final class ReaderViewController: UIViewController {
         super.viewDidLayoutSubviews()
         collectionView.collectionViewLayout.invalidateLayout()
         openFirstPageIfNeeded()
+        reflowForViewportChangeIfNeeded()
+    }
+
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        reflowForViewportChangeIfNeeded()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -230,9 +237,9 @@ final class ReaderViewController: UIViewController {
     private func configureAutoReadPanel() {
         view.addSubview(autoReadPanelView)
         NSLayoutConstraint.activate([
-            autoReadPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            autoReadPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            autoReadPanelView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            autoReadPanelView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            autoReadPanelView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            autoReadPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
         ])
         autoReadPanelView.configure(speed: autoReadSpeed, theme: activeSettings.theme)
         autoReadPanelView.onSpeedChanged = { [weak self] speed in
@@ -407,9 +414,25 @@ final class ReaderViewController: UIViewController {
 
     private func effectiveReadingLayout(from layout: ReadingLayout) -> ReadingLayout {
         var adjustedLayout = layout
+        if collectionView.bounds.width > 1,
+           collectionView.bounds.height > 1 {
+            adjustedLayout.viewportSize = collectionView.bounds.size
+        }
+
         let safeAreaInsets = view.safeAreaInsets
-        let reservedTop = max(34, safeAreaInsets.top + 34)
-        let reservedBottom = max(34, safeAreaInsets.bottom + 34)
+        let edgePadding: CGFloat = 12
+        let statusPadding: CGFloat = 34
+        let safeTop = safeAreaInsets.top > 0 ? safeAreaInsets.top + edgePadding : 0
+        let safeLeft = safeAreaInsets.left > 0 ? safeAreaInsets.left + edgePadding : 0
+        let safeBottom = safeAreaInsets.bottom > 0 ? safeAreaInsets.bottom + edgePadding : 0
+        let safeRight = safeAreaInsets.right > 0 ? safeAreaInsets.right + edgePadding : 0
+        adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, safeTop)
+        adjustedLayout.contentInsets.left = max(adjustedLayout.contentInsets.left, safeLeft)
+        adjustedLayout.contentInsets.bottom = max(adjustedLayout.contentInsets.bottom, safeBottom)
+        adjustedLayout.contentInsets.right = max(adjustedLayout.contentInsets.right, safeRight)
+
+        let reservedTop = max(statusPadding, safeAreaInsets.top + statusPadding)
+        let reservedBottom = max(statusPadding, safeAreaInsets.bottom + statusPadding)
         let reservesBottom = activeSettings.statusBarItems.contains(.batteryPercent)
             || activeSettings.statusBarItems.contains(.battery)
             || activeSettings.statusBarItems.contains(.time)
@@ -1191,12 +1214,49 @@ final class ReaderViewController: UIViewController {
         }
 
         didStartOpening = true
+        lastPaginationMetrics = currentViewportMetrics()
         activeSettings = readingSettingsStore.load().normalized(viewportSize: collectionView.bounds.size)
         loadTapAreaSettings()
         refreshContentFilterRules()
         applyReaderPreferences()
         applyTheme(activeSettings.theme)
         openPage(preferredByteOffset: nil)
+    }
+
+    private func reflowForViewportChangeIfNeeded() {
+        guard didStartOpening,
+              let metrics = currentViewportMetrics() else {
+            return
+        }
+
+        guard let previousMetrics = lastPaginationMetrics else {
+            lastPaginationMetrics = metrics
+            return
+        }
+
+        guard previousMetrics != metrics else {
+            return
+        }
+
+        lastPaginationMetrics = metrics
+        updateCurrentPageFromVisiblePage()
+        let preferredByteOffset = currentPage?.startByteOffset
+        activeSettings = activeSettings.normalized(viewportSize: collectionView.bounds.size)
+        pagingService.removeCachedPages()
+        openPage(preferredByteOffset: preferredByteOffset)
+    }
+
+    private func currentViewportMetrics() -> ReaderViewportMetrics? {
+        guard collectionView.bounds.width > 1,
+              collectionView.bounds.height > 1 else {
+            return nil
+        }
+
+        return ReaderViewportMetrics(
+            size: collectionView.bounds.size,
+            safeAreaInsets: view.safeAreaInsets,
+            scale: UIScreen.main.scale
+        )
     }
 
     private func loadTapAreaSettings() {
@@ -1881,6 +1941,25 @@ extension ReaderViewController: UIGestureRecognizerDelegate {
         }
         return activeSettings.allowsSwipeBack
             && (navigationController?.viewControllers.count ?? 0) > 1
+    }
+}
+
+private struct ReaderViewportMetrics: Equatable {
+    let width: Int
+    let height: Int
+    let topInset: Int
+    let leftInset: Int
+    let bottomInset: Int
+    let rightInset: Int
+
+    init(size: CGSize, safeAreaInsets: UIEdgeInsets, scale: CGFloat) {
+        let safeScale = max(CGFloat(1), scale)
+        width = Int((size.width * safeScale).rounded())
+        height = Int((size.height * safeScale).rounded())
+        topInset = Int((safeAreaInsets.top * safeScale).rounded())
+        leftInset = Int((safeAreaInsets.left * safeScale).rounded())
+        bottomInset = Int((safeAreaInsets.bottom * safeScale).rounded())
+        rightInset = Int((safeAreaInsets.right * safeScale).rounded())
     }
 }
 

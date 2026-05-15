@@ -95,17 +95,17 @@ final class ReaderStatusBarView: UIView {
 
         NSLayoutConstraint.activate([
             topLeftLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 6),
-            topLeftLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
-            topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20),
+            topLeftLabel.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
+            topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
 
-            bottomLeftStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20),
+            bottomLeftStackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
             bottomLeftStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -8),
             bottomLeftStackView.trailingAnchor.constraint(lessThanOrEqualTo: bottomRightStackView.leadingAnchor, constant: -12),
-            bottomLeftStackView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.48),
+            bottomLeftStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48),
 
-            bottomRightStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+            bottomRightStackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
             bottomRightStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -8),
-            bottomRightStackView.widthAnchor.constraint(lessThanOrEqualTo: widthAnchor, multiplier: 0.48)
+            bottomRightStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48)
         ])
 
         applyTheme(.paper)
