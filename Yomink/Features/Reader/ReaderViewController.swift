@@ -1035,7 +1035,7 @@ final class ReaderViewController: UIViewController {
 
     private func showTapAreaSettings() {
         let viewController = TapAreaSettingsViewController(settings: tapAreaSettings)
-        viewController.onApply = { [weak self] settings in
+        viewController.onChange = { [weak self] settings in
             guard let self else {
                 return
             }
@@ -1046,7 +1046,15 @@ final class ReaderViewController: UIViewController {
                 showTransientNotice(title: "\u{533A}\u{57DF}\u{8BBE}\u{7F6E}\u{4FDD}\u{5B58}\u{5931}\u{8D25}")
             }
         }
-        presentInNavigationSheet(viewController, detents: [.medium()])
+
+        if let navigationController {
+            navigationController.setNavigationBarHidden(false, animated: true)
+            navigationController.pushViewController(viewController, animated: true)
+        } else {
+            let navigationController = UINavigationController(rootViewController: viewController)
+            navigationController.modalPresentationStyle = .fullScreen
+            present(navigationController, animated: true)
+        }
     }
 
     private func presentInNavigationSheet(_ viewController: UIViewController, detents: [UISheetPresentationController.Detent]) {
