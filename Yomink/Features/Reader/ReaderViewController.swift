@@ -334,6 +334,7 @@ final class ReaderViewController: UIViewController {
         let shouldEnable = activeSettings.allowsSwipeBack && navigationController.viewControllers.count > 1
         if shouldEnable {
             gesture.delegate = self
+            collectionView.panGestureRecognizer.require(toFail: gesture)
         } else {
             gesture.delegate = previousInteractivePopGestureDelegate
         }
@@ -1806,16 +1807,8 @@ extension ReaderViewController: UIGestureRecognizerDelegate {
         guard gestureRecognizer === navigationController?.interactivePopGestureRecognizer else {
             return true
         }
-        guard activeSettings.allowsSwipeBack,
-              !isChromeVisible,
-              !isAutoReading,
-              !isAutoReadPanelVisible,
-              (navigationController?.viewControllers.count ?? 0) > 1 else {
-            return false
-        }
-
-        let location = gestureRecognizer.location(in: view)
-        return location.x <= 24
+        return activeSettings.allowsSwipeBack
+            && (navigationController?.viewControllers.count ?? 0) > 1
     }
 }
 
