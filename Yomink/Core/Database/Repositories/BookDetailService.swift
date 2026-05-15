@@ -37,7 +37,7 @@ final class BookDetailService: @unchecked Sendable {
 
     private static func estimatedCharacterCount(fileSize: UInt64, encoding: TextEncoding) -> UInt64 {
         switch encoding {
-        case .utf16LittleEndian:
+        case .utf16LittleEndian, .utf16BigEndian:
             return fileSize / 2
         case .gb18030, .gbk, .gb2312:
             return fileSize / 2
