@@ -9,6 +9,7 @@ final class ReaderViewController: UIViewController {
     private let openingService: ReaderOpeningService
     private let pagingService: ReaderPagingService
     private let bookmarkService: ReadingBookmarkService
+    private let chapterService: ReadingChapterService
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
@@ -30,6 +31,7 @@ final class ReaderViewController: UIViewController {
         openingService: ReaderOpeningService,
         pagingService: ReaderPagingService,
         bookmarkService: ReadingBookmarkService,
+        chapterService: ReadingChapterService,
         readingSettingsStore: ReadingSettingsStore,
         progressStore: ReadingProgressStore
     ) {
@@ -37,6 +39,7 @@ final class ReaderViewController: UIViewController {
         self.openingService = openingService
         self.pagingService = pagingService
         self.bookmarkService = bookmarkService
+        self.chapterService = chapterService
         self.readingSettingsStore = readingSettingsStore
         self.progressStore = progressStore
 
@@ -89,6 +92,7 @@ final class ReaderViewController: UIViewController {
     deinit {
         openingTask?.cancel()
         nextPageTask?.cancel()
+        chapterService.cancelParsing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -127,7 +131,7 @@ final class ReaderViewController: UIViewController {
                 image: UIImage(systemName: "list.bullet"),
                 style: .plain,
                 target: self,
-                action: #selector(showBookmarks)
+                action: #selector(showCatalogAndBookmarks)
             )
         ]
     }
@@ -214,28 +218,30 @@ final class ReaderViewController: UIViewController {
         }
     }
 
-    @objc private func showBookmarks() {
+    @objc private func showCatalogAndBookmarks() {
         Task { [weak self] in
             guard let self else {
                 return
             }
 
             do {
+                let chapters = try await chapterService.chapters(bookID: book.id)
                 let bookmarks = try await bookmarkService.bookmarks(bookID: book.id)
-                presentBookmarks(bookmarks)
+                presentCatalogAndBookmarks(chapters: chapters, bookmarks: bookmarks)
             } catch {
-                showTransientNotice(title: "\u{4E66}\u{7B7E}\u{52A0}\u{8F7D}\u{5931}\u{8D25}")
+                showTransientNotice(title: "\u{76EE}\u{5F55}\u{52A0}\u{8F7D}\u{5931}\u{8D25}")
             }
         }
     }
 
-    private func presentBookmarks(_ bookmarks: [ReadingBookmark]) {
-        guard !bookmarks.isEmpty else {
-            showTransientNotice(title: "\u{6682}\u{65E0}\u{4E66}\u{7B7E}")
-            return
+    private func presentCatalogAndBookmarks(chapters: [ReadingChapter], bookmarks: [ReadingBookmark]) {
+        let listViewController = CatalogAndBookmarksViewController(
+            chapters: chapters,
+            bookmarks: bookmarks
+        )
+        listViewController.onChapterSelected = { [weak self] chapter in
+            self?.jumpToChapter(chapter)
         }
-
-        let listViewController = BookmarkListViewController(bookmarks: bookmarks)
         listViewController.onBookmarkSelected = { [weak self] bookmark in
             self?.jumpToBookmark(bookmark)
         }
@@ -247,18 +253,26 @@ final class ReaderViewController: UIViewController {
         present(navigationController, animated: true)
     }
 
+    private func jumpToChapter(_ chapter: ReadingChapter) {
+        jumpToByteOffset(chapter.byteOffset)
+    }
+
     private func jumpToBookmark(_ bookmark: ReadingBookmark) {
+        jumpToByteOffset(bookmark.byteOffset)
+    }
+
+    private func jumpToByteOffset(_ byteOffset: UInt64) {
         saveCurrentProgress()
         progressStore.remember(
             ReadingProgress(
                 bookID: book.id,
-                byteOffset: bookmark.byteOffset,
+                byteOffset: byteOffset,
                 updatedAt: Date()
             )
         )
         progressStore.flushPendingProgress()
         pagingService.removeCachedPages()
-        openPage(preferredByteOffset: bookmark.byteOffset)
+        openPage(preferredByteOffset: byteOffset)
     }
 
     private func refreshVisibleCellsForActiveSettings() {
@@ -331,6 +345,7 @@ final class ReaderViewController: UIViewController {
         applyPagesSnapshot()
         refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: false)
+        chapterService.scheduleParsing(bookID: book.id)
     }
 
     private func appendPage(_ page: ReaderPage) {

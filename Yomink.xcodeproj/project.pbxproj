@@ -61,6 +61,12 @@
 		200000522000005220000052 /* ReadingBookmarkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000551000005510000055 /* ReadingBookmarkService.swift */; };
 		200000532000005320000053 /* BookmarkListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000561000005610000056 /* BookmarkListViewController.swift */; };
 		200000542000005420000054 /* BookmarkRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000571000005710000057 /* BookmarkRepositoryTests.swift */; };
+		200000552000005520000055 /* ReadingChapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000581000005810000058 /* ReadingChapter.swift */; };
+		200000562000005620000056 /* ChapterRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000591000005910000059 /* ChapterRepository.swift */; };
+		200000572000005720000057 /* ReadingChapterService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000601000006010000060 /* ReadingChapterService.swift */; };
+		200000582000005820000058 /* CatalogAndBookmarksViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000611000006110000061 /* CatalogAndBookmarksViewController.swift */; };
+		200000592000005920000059 /* ChapterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000621000006210000062 /* ChapterParserTests.swift */; };
+		200000602000006020000060 /* ChapterRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000631000006310000063 /* ChapterRepositoryTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -131,6 +137,12 @@
 		100000551000005510000055 /* ReadingBookmarkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingBookmarkService.swift"; sourceTree = "<group>"; };
 		100000561000005610000056 /* BookmarkListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/CatalogAndBookmarks/BookmarkListViewController.swift"; sourceTree = "<group>"; };
 		100000571000005710000057 /* BookmarkRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/BookmarkRepositoryTests.swift"; sourceTree = "<group>"; };
+		100000581000005810000058 /* ReadingChapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ChapterParsing/ReadingChapter.swift"; sourceTree = "<group>"; };
+		100000591000005910000059 /* ChapterRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Repositories/ChapterRepository.swift"; sourceTree = "<group>"; };
+		100000601000006010000060 /* ReadingChapterService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ChapterParsing/ReadingChapterService.swift"; sourceTree = "<group>"; };
+		100000611000006110000061 /* CatalogAndBookmarksViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/CatalogAndBookmarks/CatalogAndBookmarksViewController.swift"; sourceTree = "<group>"; };
+		100000621000006210000062 /* ChapterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ChapterParserTests.swift"; sourceTree = "<group>"; };
+		100000631000006310000063 /* ChapterRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/ChapterRepositoryTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -184,7 +196,10 @@
 				100000071000000710000007 /* BookRecord.swift */,
 				100000081000000810000008 /* BookRepository.swift */,
 				100000541000005410000054 /* BookmarkRepository.swift */,
+				100000591000005910000059 /* ChapterRepository.swift */,
 				100000091000000910000009 /* ChapterParser.swift */,
+				100000581000005810000058 /* ReadingChapter.swift */,
+				100000601000006010000060 /* ReadingChapterService.swift */,
 				100000101000001010000010 /* TextDecoder.swift */,
 				100000111000001110000011 /* TextEncoding.swift */,
 				100000121000001210000012 /* BookFileMapping.swift */,
@@ -216,6 +231,7 @@
 				100000501000005010000050 /* ReaderStatusBarView.swift */,
 				100000511000005110000051 /* ReaderSettingsViewController.swift */,
 				100000561000005610000056 /* BookmarkListViewController.swift */,
+				100000611000006110000061 /* CatalogAndBookmarksViewController.swift */,
 				100000271000002710000027 /* PlaceholderView.swift */,
 				100000281000002810000028 /* YominkTheme.swift */,
 				100000521000005210000052 /* ReadingThemePalette.swift */,
@@ -235,6 +251,8 @@
 				100000441000004410000044 /* ReadingProgressStoreTests.swift */,
 				100000451000004510000045 /* BookImportServiceTests.swift */,
 				100000571000005710000057 /* BookmarkRepositoryTests.swift */,
+				100000631000006310000063 /* ChapterRepositoryTests.swift */,
+				100000621000006210000062 /* ChapterParserTests.swift */,
 			);
 			path = YominkTests;
 			sourceTree = "<group>";
@@ -354,7 +372,10 @@
 				200000072000000720000007 /* BookRecord.swift in Sources */,
 				200000082000000820000008 /* BookRepository.swift in Sources */,
 				200000512000005120000051 /* BookmarkRepository.swift in Sources */,
+				200000562000005620000056 /* ChapterRepository.swift in Sources */,
 				200000092000000920000009 /* ChapterParser.swift in Sources */,
+				200000552000005520000055 /* ReadingChapter.swift in Sources */,
+				200000572000005720000057 /* ReadingChapterService.swift in Sources */,
 				200000102000001020000010 /* TextDecoder.swift in Sources */,
 				200000112000001120000011 /* TextEncoding.swift in Sources */,
 				200000122000001220000012 /* BookFileMapping.swift in Sources */,
@@ -386,6 +407,7 @@
 				200000472000004720000047 /* ReaderStatusBarView.swift in Sources */,
 				200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */,
 				200000532000005320000053 /* BookmarkListViewController.swift in Sources */,
+				200000582000005820000058 /* CatalogAndBookmarksViewController.swift in Sources */,
 				200000272000002720000027 /* PlaceholderView.swift in Sources */,
 				200000282000002820000028 /* YominkTheme.swift in Sources */,
 				200000492000004920000049 /* ReadingThemePalette.swift in Sources */,
@@ -403,6 +425,8 @@
 				200000412000004120000041 /* ReadingProgressStoreTests.swift in Sources */,
 				200000422000004220000042 /* BookImportServiceTests.swift in Sources */,
 				200000542000005420000054 /* BookmarkRepositoryTests.swift in Sources */,
+				200000602000006020000060 /* ChapterRepositoryTests.swift in Sources */,
+				200000592000005920000059 /* ChapterParserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

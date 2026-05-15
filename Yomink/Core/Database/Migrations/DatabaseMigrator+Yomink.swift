@@ -46,6 +46,30 @@ extension DatabaseMigrator {
             )
         }
 
+        migrator.registerMigration("createChapters") { database in
+            try database.create(table: "chapters", ifNotExists: true) { table in
+                table.column("id", .text).primaryKey()
+                table.column("bookID", .text).notNull()
+                table.column("title", .text).notNull()
+                table.column("byteOffset", .integer).notNull()
+                table.column("sortIndex", .integer).notNull()
+                table.column("createdAt", .double).notNull()
+            }
+            try database.execute(
+                sql: "CREATE INDEX IF NOT EXISTS chapters_on_bookID ON chapters(bookID)"
+            )
+            try database.execute(
+                sql: "CREATE UNIQUE INDEX IF NOT EXISTS chapters_on_bookID_byteOffset ON chapters(bookID, byteOffset)"
+            )
+        }
+
+        migrator.registerMigration("createChapterParseStates") { database in
+            try database.create(table: "chapterParseStates", ifNotExists: true) { table in
+                table.column("bookID", .text).primaryKey()
+                table.column("completedAt", .double).notNull()
+            }
+        }
+
         return migrator
     }
 }

@@ -9,6 +9,7 @@ struct AppEnvironment {
     let searchIndexService: SearchIndexService
     let bookImportService: BookImportService
     let readingBookmarkService: ReadingBookmarkService
+    let readingChapterService: ReadingChapterService
     let readerOpeningService: ReaderOpeningService
     let readerPagingService: ReaderPagingService
 
@@ -16,6 +17,7 @@ struct AppEnvironment {
         let databaseManager = DatabaseManager.defaultDatabase()
         let bookRepository = BookRepository(databaseManager: databaseManager)
         let bookmarkRepository = BookmarkRepository(databaseManager: databaseManager)
+        let chapterRepository = ChapterRepository(databaseManager: databaseManager)
         let appSettingsStore = AppSettingsStore()
         let readingSettingsStore = ReadingSettingsStore()
         let readingProgressStore = ReadingProgressStore(databaseManager: databaseManager)
@@ -23,6 +25,11 @@ struct AppEnvironment {
         let readerPageCache = ReaderPageCache()
         let bookImportService = BookImportService(bookRepository: bookRepository)
         let readingBookmarkService = ReadingBookmarkService(repository: bookmarkRepository)
+        let readingChapterService = ReadingChapterService(
+            bookRepository: bookRepository,
+            chapterRepository: chapterRepository,
+            parser: ChapterParser()
+        )
         let readerOpeningService = ReaderOpeningService(
             bookRepository: bookRepository,
             progressStore: readingProgressStore
@@ -41,6 +48,7 @@ struct AppEnvironment {
             searchIndexService: searchIndexService,
             bookImportService: bookImportService,
             readingBookmarkService: readingBookmarkService,
+            readingChapterService: readingChapterService,
             readerOpeningService: readerOpeningService,
             readerPagingService: readerPagingService
         )
