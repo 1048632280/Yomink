@@ -10,6 +10,11 @@ final class CatalogAndBookmarksViewController: UIViewController {
         case bookmarks
     }
 
+    private enum EdgeJumpTarget {
+        case top
+        case bottom
+    }
+
     private enum Item: Hashable {
         case chapter(ReadingChapter)
         case bookmark(ReadingBookmark)
@@ -27,6 +32,14 @@ final class CatalogAndBookmarksViewController: UIViewController {
     )
     private var selectedSegment: Segment = .chapters
     private var dataSource: UICollectionViewDiffableDataSource<Section, Item>?
+    private var edgeJumpTarget: EdgeJumpTarget = .bottom
+    private var lastContentOffsetY: CGFloat = 0
+    private lazy var edgeJumpButton = UIBarButtonItem(
+        title: "\u{5E95}\u{90E8}",
+        style: .plain,
+        target: self,
+        action: #selector(edgeJumpTapped)
+    )
 
     private lazy var collectionView: UICollectionView = {
         let layout = UICollectionViewCompositionalLayout { _, layoutEnvironment in
@@ -69,24 +82,13 @@ final class CatalogAndBookmarksViewController: UIViewController {
         segmentedControl.addTarget(self, action: #selector(segmentChanged), for: .valueChanged)
         navigationItem.titleView = segmentedControl
         navigationItem.leftBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .close,
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
             target: self,
-            action: #selector(close)
+            action: #selector(goBack)
         )
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(
-                title: "\u{5E95}\u{90E8}",
-                style: .plain,
-                target: self,
-                action: #selector(scrollToBottom)
-            ),
-            UIBarButtonItem(
-                title: "\u{9876}\u{90E8}",
-                style: .plain,
-                target: self,
-                action: #selector(scrollToTop)
-            )
-        ]
+        navigationItem.rightBarButtonItem = edgeJumpButton
+        setEdgeJumpTarget(.bottom)
     }
 
     private func configureCollectionView() {
@@ -161,21 +163,23 @@ final class CatalogAndBookmarksViewController: UIViewController {
     @objc private func segmentChanged() {
         selectedSegment = Segment(rawValue: segmentedControl.selectedSegmentIndex) ?? .chapters
         applySnapshot()
-        scrollToTop()
+        scrollToTop(animated: false)
+        setEdgeJumpTarget(.bottom)
     }
 
-    @objc private func scrollToTop() {
+    private func scrollToTop(animated: Bool) {
         guard collectionView.numberOfItems(inSection: 0) > 0 else {
             return
         }
         collectionView.scrollToItem(
             at: IndexPath(item: 0, section: 0),
             at: .top,
-            animated: true
+            animated: animated
         )
+        lastContentOffsetY = collectionView.contentOffset.y
     }
 
-    @objc private func scrollToBottom() {
+    private func scrollToBottom(animated: Bool) {
         let itemCount = collectionView.numberOfItems(inSection: 0)
         guard itemCount > 0 else {
             return
@@ -183,12 +187,60 @@ final class CatalogAndBookmarksViewController: UIViewController {
         collectionView.scrollToItem(
             at: IndexPath(item: itemCount - 1, section: 0),
             at: .bottom,
-            animated: true
+            animated: animated
         )
+        lastContentOffsetY = collectionView.contentOffset.y
     }
 
-    @objc private func close() {
-        dismiss(animated: true)
+    @objc private func edgeJumpTapped() {
+        switch edgeJumpTarget {
+        case .bottom:
+            scrollToBottom(animated: true)
+            setEdgeJumpTarget(.top)
+        case .top:
+            scrollToTop(animated: true)
+            setEdgeJumpTarget(.bottom)
+        }
+    }
+
+    private func setEdgeJumpTarget(_ target: EdgeJumpTarget) {
+        edgeJumpTarget = target
+        edgeJumpButton.title = target == .bottom ? "\u{5E95}\u{90E8}" : "\u{9876}\u{90E8}"
+    }
+
+    private func updateEdgeJumpTargetForScroll() {
+        let offsetY = collectionView.contentOffset.y
+        let minOffsetY = -collectionView.adjustedContentInset.top
+        let maxOffsetY = max(
+            minOffsetY,
+            collectionView.contentSize.height - collectionView.bounds.height + collectionView.adjustedContentInset.bottom
+        )
+        let threshold: CGFloat = 8
+
+        if offsetY <= minOffsetY + threshold {
+            setEdgeJumpTarget(.bottom)
+        } else if offsetY >= maxOffsetY - threshold {
+            setEdgeJumpTarget(.top)
+        } else if offsetY > lastContentOffsetY + 1 {
+            setEdgeJumpTarget(.bottom)
+        } else if offsetY < lastContentOffsetY - 1 {
+            setEdgeJumpTarget(.top)
+        }
+        lastContentOffsetY = offsetY
+    }
+
+    @objc private func goBack() {
+        closePage()
+    }
+
+    private func closePage(completion: (() -> Void)? = nil) {
+        if let navigationController,
+           navigationController.viewControllers.first !== self {
+            navigationController.popViewController(animated: true)
+            completion?()
+        } else {
+            dismiss(animated: true, completion: completion)
+        }
     }
 
     private func swipeActionsConfiguration(for indexPath: IndexPath) -> UISwipeActionsConfiguration? {
@@ -244,7 +296,7 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
             return
         }
 
-        dismiss(animated: true) { [onChapterSelected, onBookmarkSelected] in
+        closePage { [onChapterSelected, onBookmarkSelected] in
             switch item {
             case .chapter(let chapter):
                 onChapterSelected?(chapter)
@@ -254,5 +306,13 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
                 break
             }
         }
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        updateEdgeJumpTargetForScroll()
+    }
+
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        updateEdgeJumpTargetForScroll()
     }
 }

@@ -463,12 +463,15 @@ final class ReaderViewController: UIViewController {
             }
             self.deleteBookmark(bookmark, completion: completion)
         }
-        let navigationController = UINavigationController(rootViewController: listViewController)
-        if let sheet = navigationController.sheetPresentationController {
-            sheet.detents = [.medium(), .large()]
-            sheet.prefersGrabberVisible = true
+
+        if let navigationController {
+            navigationController.setNavigationBarHidden(false, animated: true)
+            navigationController.pushViewController(listViewController, animated: true)
+        } else {
+            let navigationController = UINavigationController(rootViewController: listViewController)
+            navigationController.modalPresentationStyle = .fullScreen
+            present(navigationController, animated: true)
         }
-        present(navigationController, animated: true)
     }
 
     private func jumpToChapter(_ chapter: ReadingChapter) {
