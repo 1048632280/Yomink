@@ -33,7 +33,7 @@ final class ReaderViewController: UIViewController {
     private var isAutoReading = false
     private var isAutoReadPanelVisible = false
     private var autoReadSpeed: CGFloat = 36
-    private var autoReadTickWorkItem: DispatchWorkItem?
+    private var autoReadTickTask: Task<Void, Never>?
     private var activeSettings = ReadingSettings.standard
     private var pagingGeneration = 0
     private let maximumResidentPages = 12
@@ -125,8 +125,7 @@ final class ReaderViewController: UIViewController {
     }
 
     deinit {
-        autoReadTickWorkItem?.cancel()
-        autoReadTickWorkItem = nil
+        autoReadTickTask?.cancel()
         Task { @MainActor in
             UIApplication.shared.isIdleTimerDisabled = false
             UIDevice.current.isBatteryMonitoringEnabled = false
@@ -465,12 +464,12 @@ final class ReaderViewController: UIViewController {
     }
 
     private func stopAutoReading() {
-        guard isAutoReading || autoReadTickWorkItem != nil else {
+        guard isAutoReading || autoReadTickTask != nil else {
             return
         }
 
-        autoReadTickWorkItem?.cancel()
-        autoReadTickWorkItem = nil
+        autoReadTickTask?.cancel()
+        autoReadTickTask = nil
         collectionView.layer.removeAllAnimations()
         updateCurrentPageFromVisiblePage()
         isAutoReading = false
@@ -494,8 +493,14 @@ final class ReaderViewController: UIViewController {
     }
 
     private func scheduleAutoReadTick() {
-        autoReadTickWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
+        autoReadTickTask?.cancel()
+        autoReadTickTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 250_000_000)
+            } catch {
+                return
+            }
+
             guard let self,
                   isAutoReading else {
                 return
@@ -506,8 +511,6 @@ final class ReaderViewController: UIViewController {
                 scheduleAutoReadTick()
             }
         }
-        autoReadTickWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
     }
 
     private func advanceAutoRead(by interval: TimeInterval) {
