@@ -15,6 +15,7 @@ final class ReaderViewController: UIViewController {
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
     private let chromeView = ReaderChromeView()
+    private let statusBarView = ReaderStatusBarView()
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, ReaderPage>?
     private var pages: [ReaderPage] = []
@@ -64,12 +65,17 @@ final class ReaderViewController: UIViewController {
         nil
     }
 
+    override var prefersHomeIndicatorAutoHidden: Bool {
+        activeSettings.autoHideHomeIndicator
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         title = book.title
         applyTheme(activeSettings.theme)
         configureCollectionView()
         configureDataSource()
+        configureStatusBarView()
         configureChrome()
         configureGestures()
         NotificationCenter.default.addObserver(
@@ -83,6 +89,7 @@ final class ReaderViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
+        applyReaderPreferences()
     }
 
     override func didReceiveMemoryWarning() {
@@ -100,12 +107,16 @@ final class ReaderViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         saveCurrentProgress()
+        UIApplication.shared.isIdleTimerDisabled = false
+        UIDevice.current.isBatteryMonitoringEnabled = false
         if isMovingFromParent || navigationController?.isBeingDismissed == true {
             navigationController?.setNavigationBarHidden(false, animated: animated)
         }
     }
 
     deinit {
+        UIApplication.shared.isIdleTimerDisabled = false
+        UIDevice.current.isBatteryMonitoringEnabled = false
         openingTask?.cancel()
         previousPageTask?.cancel()
         nextPageTask?.cancel()
@@ -148,6 +159,18 @@ final class ReaderViewController: UIViewController {
         }
     }
 
+    private func configureStatusBarView() {
+        statusBarView.translatesAutoresizingMaskIntoConstraints = false
+        statusBarView.isHidden = true
+        view.addSubview(statusBarView)
+        NSLayoutConstraint.activate([
+            statusBarView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
+            statusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            statusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            statusBarView.heightAnchor.constraint(equalToConstant: 28)
+        ])
+    }
+
     private func configureChrome() {
         view.addSubview(chromeView)
         NSLayoutConstraint.activate([
@@ -182,6 +205,7 @@ final class ReaderViewController: UIViewController {
         let palette = ReadingThemePalette.palette(for: theme)
         view.backgroundColor = palette.background
         collectionView.backgroundColor = palette.background
+        statusBarView.applyTheme(theme)
         chromeView.configure(title: book.title, state: currentSessionState(), theme: theme)
     }
 
@@ -210,9 +234,37 @@ final class ReaderViewController: UIViewController {
         activeSettings = settings.normalized(viewportSize: collectionView.bounds.size)
         readingSettingsStore.save(activeSettings)
         pagingService.removeCachedPages()
+        applyReaderPreferences()
         applyTheme(activeSettings.theme)
         refreshVisibleCellsForActiveSettings()
         openPage(preferredByteOffset: preferredByteOffset)
+    }
+
+    private func applyReaderPreferences() {
+        UIApplication.shared.isIdleTimerDisabled = activeSettings.keepScreenAwake
+        UIDevice.current.isBatteryMonitoringEnabled = activeSettings.statusBarItems.contains(.battery)
+            || activeSettings.statusBarItems.contains(.batteryPercent)
+        setNeedsUpdateOfHomeIndicatorAutoHidden()
+        configureCollectionViewForActiveSettings()
+        updateStatusBar()
+    }
+
+    private func configureCollectionViewForActiveSettings() {
+        guard let layout = collectionView.collectionViewLayout as? UICollectionViewFlowLayout else {
+            return
+        }
+
+        switch activeSettings.pageTurnMode {
+        case .horizontal, .simulatedCurl:
+            layout.scrollDirection = .horizontal
+            collectionView.isPagingEnabled = true
+            collectionView.alwaysBounceVertical = false
+        case .verticalScroll:
+            layout.scrollDirection = .vertical
+            collectionView.isPagingEnabled = false
+            collectionView.alwaysBounceVertical = true
+        }
+        layout.invalidateLayout()
     }
 
     @objc private func addBookmark() {
@@ -351,6 +403,20 @@ final class ReaderViewController: UIViewController {
             title: book.title,
             state: currentSessionState(),
             theme: activeSettings.theme
+        )
+        updateStatusBar()
+    }
+
+    private func updateStatusBar() {
+        guard let state = currentSessionState() else {
+            statusBarView.isHidden = true
+            return
+        }
+
+        statusBarView.configure(
+            state: state,
+            settings: activeSettings,
+            chapterTitle: nearestChapter(atOrBefore: state.startByteOffset)?.title
         )
     }
 
@@ -502,6 +568,7 @@ final class ReaderViewController: UIViewController {
 
         didStartOpening = true
         activeSettings = readingSettingsStore.load().normalized(viewportSize: collectionView.bounds.size)
+        applyReaderPreferences()
         applyTheme(activeSettings.theme)
         openPage(preferredByteOffset: nil)
     }
@@ -580,17 +647,25 @@ final class ReaderViewController: UIViewController {
         }
 
         pages.insert(page, at: 0)
-        let pageWidth = collectionView.bounds.width
+        let pageLength = activeSettings.pageTurnMode == .verticalScroll
+            ? collectionView.bounds.height
+            : collectionView.bounds.width
         trimResidentPagesAfterPrepending()
         applyPagesSnapshot()
-        if pageWidth > 0 {
-            collectionView.setContentOffset(
-                CGPoint(
-                    x: collectionView.contentOffset.x + pageWidth,
+        if pageLength > 0 {
+            let adjustedOffset: CGPoint
+            if activeSettings.pageTurnMode == .verticalScroll {
+                adjustedOffset = CGPoint(
+                    x: collectionView.contentOffset.x,
+                    y: collectionView.contentOffset.y + pageLength
+                )
+            } else {
+                adjustedOffset = CGPoint(
+                    x: collectionView.contentOffset.x + pageLength,
                     y: collectionView.contentOffset.y
-                ),
-                animated: false
-            )
+                )
+            }
+            collectionView.setContentOffset(adjustedOffset, animated: false)
         }
         refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
@@ -601,6 +676,7 @@ final class ReaderViewController: UIViewController {
         snapshot.appendSections([.main])
         snapshot.appendItems(pages, toSection: .main)
         dataSource?.apply(snapshot, animatingDifferences: false)
+        updateStatusBar()
     }
 
     private func loadNextPageIfNeeded() {
@@ -713,7 +789,7 @@ final class ReaderViewController: UIViewController {
 
         let visibleCenter = CGPoint(
             x: collectionView.contentOffset.x + collectionView.bounds.midX,
-            y: collectionView.bounds.midY
+            y: collectionView.contentOffset.y + collectionView.bounds.midY
         )
         guard let indexPath = collectionView.indexPathForItem(at: visibleCenter),
               pages.indices.contains(indexPath.item) else {
@@ -780,15 +856,26 @@ final class ReaderViewController: UIViewController {
         guard removePrefixCount > 0 else {
             return
         }
-        let pageWidth = collectionView.bounds.width
-        guard pageWidth > 0 else {
+        let pageLength = activeSettings.pageTurnMode == .verticalScroll
+            ? collectionView.bounds.height
+            : collectionView.bounds.width
+        guard pageLength > 0 else {
             return
         }
 
-        let adjustedOffset = CGPoint(
-            x: max(0, collectionView.contentOffset.x - CGFloat(removePrefixCount) * pageWidth),
-            y: collectionView.contentOffset.y
-        )
+        let distance = CGFloat(removePrefixCount) * pageLength
+        let adjustedOffset: CGPoint
+        if activeSettings.pageTurnMode == .verticalScroll {
+            adjustedOffset = CGPoint(
+                x: collectionView.contentOffset.x,
+                y: max(0, collectionView.contentOffset.y - distance)
+            )
+        } else {
+            adjustedOffset = CGPoint(
+                x: max(0, collectionView.contentOffset.x - distance),
+                y: collectionView.contentOffset.y
+            )
+        }
         collectionView.setContentOffset(adjustedOffset, animated: false)
     }
 
@@ -850,6 +937,16 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
     }
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        updateCurrentPageFromVisiblePage()
+        loadPreviousPageIfNeeded()
+        loadNextPageIfNeeded()
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        guard !decelerate else {
+            return
+        }
+
         updateCurrentPageFromVisiblePage()
         loadPreviousPageIfNeeded()
         loadNextPageIfNeeded()

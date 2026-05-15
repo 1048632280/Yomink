@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-enum ReadingTheme: String, Codable, CaseIterable {
+enum ReadingTheme: String, Codable, CaseIterable, Sendable {
     case paper
     case white
     case eyeCare
@@ -10,29 +10,153 @@ enum ReadingTheme: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .paper:
-            return "\u{7EB8}\u{5F20}"
+            return "\u{7F8A}\u{76AE}\u{7EB8}"
         case .white:
-            return "\u{767D}\u{8272}"
+            return "\u{7EAF}\u{767D}"
         case .eyeCare:
             return "\u{62A4}\u{773C}"
         case .black:
-            return "\u{9ED1}\u{8272}"
+            return "\u{6DF1}\u{9083}\u{9ED1}"
         }
     }
 }
 
-struct ReadingSettings: Hashable, Codable {
+enum ReadingPageTurnMode: String, Codable, CaseIterable, Sendable {
+    case horizontal
+    case simulatedCurl
+    case verticalScroll
+
+    var displayName: String {
+        switch self {
+        case .horizontal:
+            return "\u{5DE6}\u{53F3}\u{5E73}\u{79FB}"
+        case .simulatedCurl:
+            return "\u{4EFF}\u{771F}\u{7FFB}\u{9875}"
+        case .verticalScroll:
+            return "\u{4E0A}\u{4E0B}\u{6ED1}\u{52A8}"
+        }
+    }
+}
+
+enum ReadingLayoutDensity: String, Codable, CaseIterable, Sendable {
+    case compact
+    case standard
+    case loose
+    case custom
+
+    var displayName: String {
+        switch self {
+        case .compact:
+            return "\u{7D27}\u{51D1}"
+        case .standard:
+            return "\u{6807}\u{51C6}"
+        case .loose:
+            return "\u{5BBD}\u{677E}"
+        case .custom:
+            return "\u{81EA}\u{5B9A}\u{4E49}"
+        }
+    }
+}
+
+enum ReadingStatusBarItem: String, Codable, CaseIterable, Hashable, Sendable {
+    case time
+    case battery
+    case batteryPercent
+    case chapterTitle
+    case chapterPageProgress
+    case bookProgress
+
+    var displayName: String {
+        switch self {
+        case .time:
+            return "\u{65F6}\u{95F4}"
+        case .battery:
+            return "\u{7535}\u{6C60}"
+        case .batteryPercent:
+            return "\u{7535}\u{91CF}"
+        case .chapterTitle:
+            return "\u{7AE0}\u{8282}\u{6807}\u{9898}"
+        case .chapterPageProgress:
+            return "\u{7AE0}\u{8282}\u{9875}\u{8FDB}\u{5EA6}"
+        case .bookProgress:
+            return "\u{5168}\u{4E66}\u{767E}\u{5206}\u{6BD4}"
+        }
+    }
+}
+
+struct ReadingSettings: Hashable, Codable, Sendable {
     static let fontSizeRange: ClosedRange<Double> = 14...30
     static let lineSpacingRange: ClosedRange<Double> = 2...14
     static let paragraphSpacingRange: ClosedRange<Double> = 4...18
+    static let horizontalInsetRange: ClosedRange<Double> = 12...48
+    static let verticalInsetRange: ClosedRange<Double> = 16...56
 
     var layout: ReadingLayout
     var theme: ReadingTheme
+    var pageTurnMode: ReadingPageTurnMode
+    var layoutDensity: ReadingLayoutDensity
+    var keepScreenAwake: Bool
+    var autoHideHomeIndicator: Bool
+    var statusBarItems: Set<ReadingStatusBarItem>
 
     static let standard = ReadingSettings(
         layout: .defaultPhone,
-        theme: .paper
+        theme: .paper,
+        pageTurnMode: .horizontal,
+        layoutDensity: .standard,
+        keepScreenAwake: false,
+        autoHideHomeIndicator: false,
+        statusBarItems: []
     )
+
+    init(
+        layout: ReadingLayout,
+        theme: ReadingTheme,
+        pageTurnMode: ReadingPageTurnMode,
+        layoutDensity: ReadingLayoutDensity,
+        keepScreenAwake: Bool,
+        autoHideHomeIndicator: Bool,
+        statusBarItems: Set<ReadingStatusBarItem>
+    ) {
+        self.layout = layout
+        self.theme = theme
+        self.pageTurnMode = pageTurnMode
+        self.layoutDensity = layoutDensity
+        self.keepScreenAwake = keepScreenAwake
+        self.autoHideHomeIndicator = autoHideHomeIndicator
+        self.statusBarItems = statusBarItems
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case layout
+        case theme
+        case pageTurnMode
+        case layoutDensity
+        case keepScreenAwake
+        case autoHideHomeIndicator
+        case statusBarItems
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self.standard
+        layout = try container.decodeIfPresent(ReadingLayout.self, forKey: .layout) ?? defaults.layout
+        theme = try container.decodeIfPresent(ReadingTheme.self, forKey: .theme) ?? defaults.theme
+        pageTurnMode = try container.decodeIfPresent(
+            ReadingPageTurnMode.self,
+            forKey: .pageTurnMode
+        ) ?? defaults.pageTurnMode
+        layoutDensity = try container.decodeIfPresent(
+            ReadingLayoutDensity.self,
+            forKey: .layoutDensity
+        ) ?? (layout == defaults.layout ? defaults.layoutDensity : .custom)
+        keepScreenAwake = try container.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? false
+        autoHideHomeIndicator = try container.decodeIfPresent(Bool.self, forKey: .autoHideHomeIndicator) ?? false
+        statusBarItems = try container.decodeIfPresent(
+            Set<ReadingStatusBarItem>.self,
+            forKey: .statusBarItems
+        ) ?? []
+    }
 
     func normalized(viewportSize: CGSize? = nil) -> ReadingSettings {
         var settings = self
@@ -44,6 +168,22 @@ struct ReadingSettings: Hashable, Codable {
         settings.layout.paragraphSpacing = Self.clamp(
             settings.layout.paragraphSpacing,
             in: Self.paragraphSpacingRange
+        )
+        settings.layout.contentInsets.left = Self.clamp(
+            settings.layout.contentInsets.left,
+            in: Self.horizontalInsetRange
+        )
+        settings.layout.contentInsets.right = Self.clamp(
+            settings.layout.contentInsets.right,
+            in: Self.horizontalInsetRange
+        )
+        settings.layout.contentInsets.top = Self.clamp(
+            settings.layout.contentInsets.top,
+            in: Self.verticalInsetRange
+        )
+        settings.layout.contentInsets.bottom = Self.clamp(
+            settings.layout.contentInsets.bottom,
+            in: Self.verticalInsetRange
         )
         return settings
     }
