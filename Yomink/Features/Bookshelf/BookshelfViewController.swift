@@ -16,6 +16,12 @@ final class BookshelfViewController: UIViewController {
     private var groupList = BookGroupList(totalBookCount: 0, ungroupedBookCount: 0, groups: [])
     private var selectedBookIDs: Set<UUID> = []
     private var isSelectingBooks = false
+    private let selectionMenuContainer = UIView()
+    private let selectionMenuStack = UIStackView()
+    private let deleteSelectionButton = UIButton(type: .system)
+    private let moveSelectionButton = UIButton(type: .system)
+    private let invertSelectionButton = UIButton(type: .system)
+    private let finishSelectionButton = UIButton(type: .system)
 
     private lazy var collectionView: UICollectionView = {
         let backgroundColor = YominkTheme.background
@@ -47,14 +53,9 @@ final class BookshelfViewController: UIViewController {
         title = viewModel.title
         configureNavigationItems()
         configureCollectionView()
-        configureToolbar()
+        configureSelectionMenu()
         bindViewModel()
         viewModel.refresh()
-    }
-
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        navigationController?.setToolbarHidden(true, animated: animated)
     }
 
     func refreshBooks() {
@@ -108,12 +109,13 @@ final class BookshelfViewController: UIViewController {
             case .book(let bookItem):
                 content.text = bookItem.book.title
                 content.secondaryText = Self.subtitle(for: bookItem)
-                content.image = UIImage(systemName: "book.closed")
                 if isSelectingBooks {
-                    cell.accessories = selectedBookIDs.contains(bookItem.book.id)
-                        ? [.checkmark()]
-                        : []
+                    let isSelected = selectedBookIDs.contains(bookItem.book.id)
+                    content.image = UIImage(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    content.imageProperties.tintColor = isSelected ? view.tintColor : YominkTheme.secondaryText
+                    cell.accessories = []
                 } else {
+                    content.image = UIImage(systemName: "book.closed")
                     cell.accessories = [.disclosureIndicator()]
                 }
             case .emptyState:
@@ -137,30 +139,92 @@ final class BookshelfViewController: UIViewController {
         collectionView.addGestureRecognizer(longPressGesture)
     }
 
-    private func configureToolbar() {
-        toolbarItems = [
-            UIBarButtonItem(
-                title: "\u{79FB}\u{52A8}",
-                style: .plain,
-                target: self,
-                action: #selector(moveSelectedBooks)
-            ),
-            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-            UIBarButtonItem(
-                title: "\u{5220}\u{9664}",
-                style: .plain,
-                target: self,
-                action: #selector(deleteSelectedBooks)
-            )
-        ]
-        navigationController?.setToolbarHidden(true, animated: false)
+    private func configureSelectionMenu() {
+        selectionMenuContainer.translatesAutoresizingMaskIntoConstraints = false
+        selectionMenuContainer.backgroundColor = UIColor.secondarySystemBackground.withAlphaComponent(0.96)
+        selectionMenuContainer.layer.cornerRadius = 8
+        selectionMenuContainer.layer.shadowColor = UIColor.black.cgColor
+        selectionMenuContainer.layer.shadowOpacity = 0.18
+        selectionMenuContainer.layer.shadowRadius = 12
+        selectionMenuContainer.layer.shadowOffset = CGSize(width: 0, height: 5)
+        selectionMenuContainer.alpha = 0
+        selectionMenuContainer.isHidden = true
+        selectionMenuContainer.transform = CGAffineTransform(translationX: 0, y: 12)
+        view.addSubview(selectionMenuContainer)
+
+        selectionMenuStack.translatesAutoresizingMaskIntoConstraints = false
+        selectionMenuStack.axis = .horizontal
+        selectionMenuStack.alignment = .center
+        selectionMenuStack.distribution = .fillEqually
+        selectionMenuStack.spacing = 4
+        selectionMenuContainer.addSubview(selectionMenuStack)
+
+        configureSelectionMenuButton(
+            deleteSelectionButton,
+            title: "\u{5220}\u{9664}",
+            systemName: "trash",
+            action: #selector(deleteSelectedBooks)
+        )
+        configureSelectionMenuButton(
+            moveSelectionButton,
+            title: "\u{79FB}\u{52A8}",
+            systemName: "folder",
+            action: #selector(moveSelectedBooks)
+        )
+        configureSelectionMenuButton(
+            invertSelectionButton,
+            title: "\u{53CD}\u{9009}",
+            systemName: "arrow.triangle.2.circlepath",
+            action: #selector(invertSelection)
+        )
+        configureSelectionMenuButton(
+            finishSelectionButton,
+            title: "\u{5B8C}\u{6210}",
+            systemName: "checkmark",
+            action: #selector(cancelSelection)
+        )
+
+        deleteSelectionButton.configuration?.baseForegroundColor = .systemRed
+        [
+            deleteSelectionButton,
+            moveSelectionButton,
+            invertSelectionButton,
+            finishSelectionButton
+        ].forEach { button in
+            selectionMenuStack.addArrangedSubview(button)
+        }
+
+        NSLayoutConstraint.activate([
+            selectionMenuContainer.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 14),
+            selectionMenuContainer.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -14),
+            selectionMenuContainer.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -10),
+            selectionMenuContainer.heightAnchor.constraint(equalToConstant: 62),
+
+            selectionMenuStack.topAnchor.constraint(equalTo: selectionMenuContainer.topAnchor, constant: 5),
+            selectionMenuStack.leadingAnchor.constraint(equalTo: selectionMenuContainer.leadingAnchor, constant: 8),
+            selectionMenuStack.trailingAnchor.constraint(equalTo: selectionMenuContainer.trailingAnchor, constant: -8),
+            selectionMenuStack.bottomAnchor.constraint(equalTo: selectionMenuContainer.bottomAnchor, constant: -5)
+        ])
+        updateSelectionMenuState()
+    }
+
+    private func configureSelectionMenuButton(_ button: UIButton, title: String, systemName: String, action: Selector) {
+        var configuration = UIButton.Configuration.plain()
+        configuration.title = title
+        configuration.image = UIImage(systemName: systemName)
+        configuration.imagePlacement = .top
+        configuration.imagePadding = 3
+        configuration.contentInsets = NSDirectionalEdgeInsets(top: 2, leading: 4, bottom: 2, trailing: 4)
+        button.configuration = configuration
+        button.titleLabel?.font = .preferredFont(forTextStyle: .caption1)
+        button.addTarget(self, action: action, for: .touchUpInside)
     }
 
     private func bindViewModel() {
         viewModel.items
             .receive(on: DispatchQueue.main)
             .sink { [weak self] items in
-                self?.applySnapshot(items: items)
+                self?.handleItemsChanged(items)
             }
             .store(in: &cancellables)
 
@@ -177,6 +241,14 @@ final class BookshelfViewController: UIViewController {
         snapshot.appendSections([.main])
         snapshot.appendItems(items, toSection: .main)
         dataSource?.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func handleItemsChanged(_ items: [BookshelfViewModel.Item]) {
+        if isSelectingBooks {
+            selectedBookIDs.formIntersection(Set(bookIDs(in: items)))
+        }
+        applySnapshot(items: items)
+        updateSelectionMenuState()
     }
 
     @objc private func showGroups() {
@@ -261,6 +333,17 @@ final class BookshelfViewController: UIViewController {
 
     @objc private func cancelSelection() {
         endSelectionMode()
+    }
+
+    @objc private func invertSelection() {
+        guard isSelectingBooks else {
+            return
+        }
+
+        let allBookIDs = Set(bookIDs(in: viewModel.items.value))
+        selectedBookIDs = allBookIDs.subtracting(selectedBookIDs)
+        refreshVisibleSnapshot()
+        updateSelectionMenuState()
     }
 
     @objc private func moveSelectedBooks() {
@@ -365,15 +448,8 @@ final class BookshelfViewController: UIViewController {
     private func beginSelectionMode(selecting bookID: UUID) {
         isSelectingBooks = true
         selectedBookIDs = [bookID]
-        navigationItem.leftBarButtonItem = nil
-        navigationItem.rightBarButtonItems = [
-            UIBarButtonItem(
-                barButtonSystemItem: .cancel,
-                target: self,
-                action: #selector(cancelSelection)
-            )
-        ]
-        navigationController?.setToolbarHidden(false, animated: true)
+        setSelectionMenuVisible(true, animated: true)
+        updateSelectionMenuState()
         refreshVisibleSnapshot()
     }
 
@@ -385,7 +461,8 @@ final class BookshelfViewController: UIViewController {
         isSelectingBooks = false
         selectedBookIDs.removeAll()
         configureNavigationItems()
-        navigationController?.setToolbarHidden(true, animated: true)
+        setSelectionMenuVisible(false, animated: true)
+        updateSelectionMenuState()
         refreshVisibleSnapshot()
     }
 
@@ -396,11 +473,8 @@ final class BookshelfViewController: UIViewController {
             selectedBookIDs.insert(bookID)
         }
 
-        if selectedBookIDs.isEmpty {
-            endSelectionMode()
-        } else {
-            refreshVisibleSnapshot()
-        }
+        refreshVisibleSnapshot()
+        updateSelectionMenuState()
     }
 
     private func performDeleteSelectedBooks() {
@@ -430,7 +504,53 @@ final class BookshelfViewController: UIViewController {
     }
 
     private func refreshVisibleSnapshot() {
-        applySnapshot(items: viewModel.items.value)
+        guard var snapshot = dataSource?.snapshot() else {
+            applySnapshot(items: viewModel.items.value)
+            return
+        }
+
+        snapshot.reconfigureItems(snapshot.itemIdentifiers)
+        dataSource?.apply(snapshot, animatingDifferences: false)
+    }
+
+    private func setSelectionMenuVisible(_ isVisible: Bool, animated: Bool) {
+        let bottomInset: CGFloat = isVisible ? 88 : 0
+        collectionView.contentInset.bottom = bottomInset
+        collectionView.verticalScrollIndicatorInsets.bottom = bottomInset
+
+        let updates = {
+            self.selectionMenuContainer.alpha = isVisible ? 1 : 0
+            self.selectionMenuContainer.transform = isVisible ? .identity : CGAffineTransform(translationX: 0, y: 12)
+        }
+
+        selectionMenuContainer.isHidden = false
+        if animated {
+            UIView.animate(withDuration: 0.18, delay: 0, options: [.beginFromCurrentState, .curveEaseOut]) {
+                updates()
+            } completion: { _ in
+                self.selectionMenuContainer.isHidden = !isVisible
+            }
+        } else {
+            updates()
+            selectionMenuContainer.isHidden = !isVisible
+        }
+    }
+
+    private func updateSelectionMenuState() {
+        let hasSelection = !selectedBookIDs.isEmpty
+        deleteSelectionButton.isEnabled = hasSelection
+        moveSelectionButton.isEnabled = hasSelection
+        invertSelectionButton.isEnabled = isSelectingBooks && !bookIDs(in: viewModel.items.value).isEmpty
+        finishSelectionButton.isEnabled = isSelectingBooks
+    }
+
+    private func bookIDs(in items: [BookshelfViewModel.Item]) -> [UUID] {
+        items.compactMap { item in
+            guard case .book(let bookItem) = item else {
+                return nil
+            }
+            return bookItem.book.id
+        }
     }
 
     private func presentError(title: String) {
@@ -465,6 +585,10 @@ extension BookshelfViewController: UICollectionViewDelegate {
         _ collectionView: UICollectionView,
         trailingSwipeActionsConfigurationForItemAt indexPath: IndexPath
     ) -> UISwipeActionsConfiguration? {
+        guard !isSelectingBooks else {
+            return nil
+        }
+
         guard let item = dataSource?.itemIdentifier(for: indexPath),
               case .book(let bookItem) = item else {
             return nil
@@ -474,8 +598,7 @@ extension BookshelfViewController: UICollectionViewDelegate {
             style: .destructive,
             title: "\u{5220}\u{9664}"
         ) { [weak self] _, _, completion in
-            self?.selectedBookIDs = [bookItem.book.id]
-            self?.isSelectingBooks = true
+            self?.beginSelectionMode(selecting: bookItem.book.id)
             self?.deleteSelectedBooks()
             completion(true)
         }
@@ -487,31 +610,7 @@ extension BookshelfViewController: UICollectionViewDelegate {
         contextMenuConfigurationForItemAt indexPath: IndexPath,
         point: CGPoint
     ) -> UIContextMenuConfiguration? {
-        guard let item = dataSource?.itemIdentifier(for: indexPath),
-              case .book(let bookItem) = item else {
-            return nil
-        }
-
-        return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
-            UIMenu(children: [
-                UIAction(
-                    title: "\u{79FB}\u{52A8}\u{5230}\u{5206}\u{7EC4}",
-                    image: UIImage(systemName: "folder")
-                ) { _ in
-                    self?.selectedBookIDs = [bookItem.book.id]
-                    self?.isSelectingBooks = true
-                    self?.moveSelectedBooks()
-                },
-                UIAction(
-                    title: "\u{5220}\u{9664}",
-                    image: UIImage(systemName: "trash"),
-                    attributes: .destructive
-                ) { _ in
-                    self?.selectedBookIDs = [bookItem.book.id]
-                    self?.deleteSelectedBooks()
-                }
-            ])
-        }
+        return nil
     }
 }
 
