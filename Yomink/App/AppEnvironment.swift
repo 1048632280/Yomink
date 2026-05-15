@@ -3,6 +3,7 @@ import Foundation
 struct AppEnvironment {
     let databaseManager: DatabaseManager
     let bookRepository: BookRepository
+    let bookGroupRepository: BookGroupRepository
     let appSettingsStore: AppSettingsStore
     let readingSettingsStore: ReadingSettingsStore
     let readingProgressStore: ReadingProgressStore
@@ -16,6 +17,7 @@ struct AppEnvironment {
     static func makeDefault() -> AppEnvironment {
         let databaseManager = DatabaseManager.defaultDatabase()
         let bookRepository = BookRepository(databaseManager: databaseManager)
+        let bookGroupRepository = BookGroupRepository(databaseManager: databaseManager)
         let bookmarkRepository = BookmarkRepository(databaseManager: databaseManager)
         let chapterRepository = ChapterRepository(databaseManager: databaseManager)
         let appSettingsStore = AppSettingsStore()
@@ -45,6 +47,7 @@ struct AppEnvironment {
         return AppEnvironment(
             databaseManager: databaseManager,
             bookRepository: bookRepository,
+            bookGroupRepository: bookGroupRepository,
             appSettingsStore: appSettingsStore,
             readingSettingsStore: readingSettingsStore,
             readingProgressStore: readingProgressStore,

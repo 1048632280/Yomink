@@ -16,7 +16,13 @@ final class AppCoordinator {
     func start() {
         let viewModel = BookshelfViewModel(
             bookRepository: environment.bookRepository,
-            appSettingsStore: environment.appSettingsStore
+            groupRepository: environment.bookGroupRepository,
+            appSettingsStore: environment.appSettingsStore,
+            deletionService: BookDeletionService(
+                bookRepository: environment.bookRepository,
+                searchIndexService: environment.searchIndexService,
+                pagingService: environment.readerPagingService
+            )
         )
         let bookshelfViewController = BookshelfViewController(viewModel: viewModel)
         bookshelfViewController.onImportRequested = { [weak self] in

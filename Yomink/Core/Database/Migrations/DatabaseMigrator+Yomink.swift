@@ -113,6 +113,31 @@ extension DatabaseMigrator {
             }
         }
 
+        migrator.registerMigration("createBookGroups") { database in
+            try database.create(table: "bookGroups", ifNotExists: true) { table in
+                table.column("id", .text).primaryKey()
+                table.column("name", .text).notNull()
+                table.column("sortIndex", .integer).notNull()
+                table.column("createdAt", .double).notNull()
+                table.column("updatedAt", .double).notNull()
+            }
+            try database.execute(
+                sql: "CREATE UNIQUE INDEX IF NOT EXISTS bookGroups_on_name ON bookGroups(name COLLATE NOCASE)"
+            )
+            try database.execute(
+                sql: "CREATE INDEX IF NOT EXISTS bookGroups_on_sortIndex ON bookGroups(sortIndex)"
+            )
+        }
+
+        migrator.registerMigration("addBookGroupID") { database in
+            try database.alter(table: "books") { table in
+                table.add(column: "groupID", .text)
+            }
+            try database.execute(
+                sql: "CREATE INDEX IF NOT EXISTS books_on_groupID ON books(groupID)"
+            )
+        }
+
         return migrator
     }
 }

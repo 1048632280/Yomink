@@ -56,6 +56,7 @@ final class BookImportService: @unchecked Sendable {
             id: id,
             title: inferTitle(sourceURL: sourceURL, sample: sample, encoding: encoding),
             author: nil,
+            groupID: nil,
             filePath: destinationURL.path,
             encoding: encoding,
             fileSize: fileSize,

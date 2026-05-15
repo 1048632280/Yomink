@@ -7,6 +7,7 @@ struct BookRecord: Codable, FetchableRecord, PersistableRecord, Hashable, Sendab
     var id: UUID
     var title: String
     var author: String?
+    var groupID: UUID? = nil
     var filePath: String
     var encoding: TextEncoding
     var fileSize: UInt64
