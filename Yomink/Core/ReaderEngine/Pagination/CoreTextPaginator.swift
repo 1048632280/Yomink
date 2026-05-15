@@ -62,13 +62,7 @@ struct CoreTextPaginator {
             throw PaginationError.windowTooLarge
         }
 
-        let attributedString = NSAttributedString(
-            string: window.text,
-            attributes: [
-                NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName(layout.fontName as CFString, layout.fontSize, nil),
-                NSAttributedString.Key(kCTParagraphStyleAttributeName as String): makeParagraphStyle(layout: layout)
-            ]
-        )
+        let attributedString = ReaderTextStyler.attributedText(for: window.text, layout: layout)
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
         let path = CGMutablePath()
         let textRect = layout.contentRect(
@@ -90,30 +84,6 @@ struct CoreTextPaginator {
             byteRange: window.startByteOffset..<estimatedEndOffset
         )
         return PaginatedFirstPage(pageByteRange: pageByteRange, text: visibleText)
-    }
-
-    private func makeParagraphStyle(layout: ReadingLayout) -> CTParagraphStyle {
-        var lineSpacing = layout.lineSpacing
-        var paragraphSpacing = layout.paragraphSpacing
-        return withUnsafePointer(to: &lineSpacing) { lineSpacingPointer in
-            withUnsafePointer(to: &paragraphSpacing) { paragraphSpacingPointer in
-                let settings = [
-                    CTParagraphStyleSetting(
-                        spec: .lineSpacingAdjustment,
-                        valueSize: MemoryLayout<CGFloat>.size,
-                        value: UnsafeRawPointer(lineSpacingPointer)
-                    ),
-                    CTParagraphStyleSetting(
-                        spec: .paragraphSpacing,
-                        valueSize: MemoryLayout<CGFloat>.size,
-                        value: UnsafeRawPointer(paragraphSpacingPointer)
-                    )
-                ]
-                return settings.withUnsafeBufferPointer { buffer in
-                    CTParagraphStyleCreate(buffer.baseAddress, buffer.count)
-                }
-            }
-        }
     }
 
     private func estimateByteOffset(visibleText: String, window: TextWindow, encoding: TextEncoding) -> UInt64 {

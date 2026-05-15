@@ -18,7 +18,6 @@ final class ReaderViewController: UIViewController {
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
     private let chromeView = ReaderChromeView()
-    private let statusBarView = ReaderStatusBarView()
     private let autoReadPanelView = AutoReadSpeedPanelView()
     private var moreMenuView: UIView?
 
@@ -112,7 +111,6 @@ final class ReaderViewController: UIViewController {
         applyTheme(activeSettings.theme)
         configureCollectionView()
         configureDataSource()
-        configureStatusBarView()
         configureAutoReadPanel()
         configureChrome()
         configureGestures()
@@ -120,6 +118,18 @@ final class ReaderViewController: UIViewController {
             self,
             selector: #selector(saveCurrentProgressForBackground),
             name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshVisibleReaderWidgets),
+            name: UIDevice.batteryLevelDidChangeNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(refreshVisibleReaderWidgets),
+            name: UIDevice.batteryStateDidChangeNotification,
             object: nil
         )
     }
@@ -215,21 +225,14 @@ final class ReaderViewController: UIViewController {
                   ) as? ReaderPageCell else {
                 return UICollectionViewCell()
             }
-            cell.configure(page: page, settings: pageRenderingSettings, filterRules: contentFilterRules)
+            cell.configure(
+                page: page,
+                settings: pageRenderingSettings,
+                filterRules: contentFilterRules,
+                statusConfiguration: statusConfiguration(for: page)
+            )
             return cell
         }
-    }
-
-    private func configureStatusBarView() {
-        statusBarView.translatesAutoresizingMaskIntoConstraints = false
-        statusBarView.isHidden = true
-        view.addSubview(statusBarView)
-        NSLayoutConstraint.activate([
-            statusBarView.topAnchor.constraint(equalTo: view.topAnchor),
-            statusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            statusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            statusBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
     }
 
     private func configureAutoReadPanel() {
@@ -283,7 +286,6 @@ final class ReaderViewController: UIViewController {
         let palette = ReadingThemePalette.palette(for: theme)
         view.backgroundColor = palette.background
         collectionView.backgroundColor = palette.background
-        statusBarView.applyTheme(theme)
         autoReadPanelView.configure(speed: autoReadSpeed, theme: theme)
         configureChromeView()
     }
@@ -308,6 +310,10 @@ final class ReaderViewController: UIViewController {
         present(navigationController, animated: true)
     }
 
+    @objc private func refreshVisibleReaderWidgets() {
+        refreshVisibleCellsForActiveSettings()
+    }
+
     private func applyReadingSettings(_ settings: ReadingSettings) {
         updateCurrentPageFromVisiblePage()
         let preferredByteOffset = currentPage?.startByteOffset
@@ -327,7 +333,7 @@ final class ReaderViewController: UIViewController {
         setNeedsUpdateOfHomeIndicatorAutoHidden()
         configureSwipeBackGesture()
         configureCollectionViewForActiveSettings()
-        updateStatusBar()
+        refreshVisibleCellsForActiveSettings()
     }
 
     private func configureSwipeBackGesture() {
@@ -430,7 +436,7 @@ final class ReaderViewController: UIViewController {
         adjustedLayout.contentInsets.right = max(adjustedLayout.contentInsets.right, safeRight)
 
         let reservedTop = max(statusPadding, safeAreaInsets.top + statusPadding)
-        let reservedBottom = max(statusPadding, safeAreaInsets.bottom + statusPadding)
+        let reservedBottom = max(statusPadding, safeAreaInsets.bottom + 24)
         let reservesBottom = activeSettings.statusBarItems.contains(.batteryPercent)
             || activeSettings.statusBarItems.contains(.battery)
             || activeSettings.statusBarItems.contains(.time)
@@ -750,7 +756,6 @@ final class ReaderViewController: UIViewController {
     private func updateChrome() {
         configureChromeView()
         chromeView.setBookmarkActive(isCurrentPageBookmarked)
-        updateStatusBar()
     }
 
     private func configureChromeView() {
@@ -810,21 +815,6 @@ final class ReaderViewController: UIViewController {
         bookmarkStateByteOffset = nil
         isCurrentPageBookmarked = false
         chromeView.setBookmarkActive(false)
-    }
-
-    private func updateStatusBar() {
-        guard let state = currentSessionState() else {
-            statusBarView.isHidden = true
-            return
-        }
-
-        let chapter = nearestChapter(atOrBefore: state.startByteOffset)
-        statusBarView.configure(
-            state: state,
-            settings: activeSettings,
-            chapterTitle: chapter?.title,
-            chapterProgress: chapterProgress(for: state, chapter: chapter)
-        )
     }
 
     private func currentSessionState() -> ReaderSessionState? {
@@ -940,6 +930,40 @@ final class ReaderViewController: UIViewController {
         return chapterRange(containing: byteOffset - 1).startByteOffset
     }
 
+    private func statusConfiguration(for page: ReaderPage) -> ReaderStatusBarView.Configuration? {
+        guard !activeSettings.statusBarItems.isEmpty else {
+            return nil
+        }
+
+        let state = ReaderSessionState(
+            bookID: page.bookID,
+            currentPageIndex: page.pageIndex,
+            residentPageCount: pages.count,
+            startByteOffset: page.startByteOffset,
+            endByteOffset: page.endByteOffset,
+            fileSize: book.fileSize,
+            isLoadingNextPage: isLoadingNextPage,
+            didReachEndOfBook: didReachEndOfBook
+        )
+        let chapter = nearestChapter(atOrBefore: page.startByteOffset)
+        return ReaderStatusBarView.Configuration(
+            state: state,
+            settings: activeSettings,
+            chapterTitle: statusChapterTitle(for: page, chapter: chapter),
+            chapterProgress: chapterProgress(for: page, state: state, chapter: chapter)
+        )
+    }
+
+    private func statusChapterTitle(for page: ReaderPage, chapter: ReadingChapter?) -> String? {
+        guard activeSettings.statusBarItems.contains(.chapterTitle) else {
+            return nil
+        }
+
+        return ReaderTextStyler.startsWithChapterTitle(page.text)
+            ? book.title
+            : (chapter?.title ?? book.title)
+    }
+
     private func jumpToAdjacentChapter(direction: Int) {
         updateCurrentPageFromVisiblePage()
         guard let currentPage else {
@@ -971,13 +995,10 @@ final class ReaderViewController: UIViewController {
     }
 
     private func chapterProgress(
-        for state: ReaderSessionState,
+        for page: ReaderPage,
+        state: ReaderSessionState,
         chapter: ReadingChapter?
     ) -> ReaderStatusBarView.ChapterProgress {
-        guard let currentPage else {
-            return ReaderStatusBarView.ChapterProgress(pageIndex: state.currentPageIndex, pageCount: nil)
-        }
-
         guard let chapter else {
             return ReaderStatusBarView.ChapterProgress(pageIndex: state.currentPageIndex, pageCount: nil)
         }
@@ -988,10 +1009,10 @@ final class ReaderViewController: UIViewController {
             return ReaderStatusBarView.ChapterProgress(pageIndex: state.currentPageIndex, pageCount: nil)
         }
 
-        let pageByteCount = max(UInt64(1), currentPage.endByteOffset - currentPage.startByteOffset)
+        let pageByteCount = max(UInt64(1), page.endByteOffset - page.startByteOffset)
         let chapterByteCount = max(UInt64(1), chapterEndByteOffset - chapter.byteOffset)
-        let completedByteCount = state.startByteOffset > chapter.byteOffset
-            ? state.startByteOffset - chapter.byteOffset
+        let completedByteCount = page.startByteOffset > chapter.byteOffset
+            ? page.startByteOffset - chapter.byteOffset
             : 0
         let pageCount = max(1, Int(ceil(Double(chapterByteCount) / Double(pageByteCount))))
         let pageIndex = min(pageCount - 1, Int(Double(completedByteCount) / Double(pageByteCount)))
@@ -1302,7 +1323,13 @@ final class ReaderViewController: UIViewController {
                   let cell = collectionView.cellForItem(at: indexPath) as? ReaderPageCell else {
                 continue
             }
-            cell.configure(page: pages[indexPath.item], settings: pageRenderingSettings, filterRules: contentFilterRules)
+            let page = pages[indexPath.item]
+            cell.configure(
+                page: page,
+                settings: pageRenderingSettings,
+                filterRules: contentFilterRules,
+                statusConfiguration: statusConfiguration(for: page)
+            )
         }
     }
 
@@ -1493,7 +1520,6 @@ final class ReaderViewController: UIViewController {
         snapshot.appendSections([.main])
         snapshot.appendItems(pages, toSection: .main)
         dataSource?.apply(snapshot, animatingDifferences: false)
-        updateStatusBar()
     }
 
     private func loadNextPageIfNeeded(scrollAfterLoading: Bool = false) {

@@ -21,6 +21,7 @@
 		200000122000001220000012 /* BookFileMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000121000001210000012 /* BookFileMapping.swift */; };
 		200000132000001320000013 /* ReaderPageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000131000001310000013 /* ReaderPageCache.swift */; };
 		200000142000001420000014 /* CoreTextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000141000001410000014 /* CoreTextPaginator.swift */; };
+		200000852000008520000085 /* ReaderTextStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000881000008810000088 /* ReaderTextStyler.swift */; };
 		200000152000001520000015 /* PageByteRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000151000001510000015 /* PageByteRange.swift */; };
 		200000162000001620000016 /* ReadingLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000161000001610000016 /* ReadingLayout.swift */; };
 		200000172000001720000017 /* ReadingProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000171000001710000017 /* ReadingProgress.swift */; };
@@ -122,6 +123,7 @@
 		100000121000001210000012 /* BookFileMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/FileMapping/BookFileMapping.swift"; sourceTree = "<group>"; };
 		100000131000001310000013 /* ReaderPageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/PageCache/ReaderPageCache.swift"; sourceTree = "<group>"; };
 		100000141000001410000014 /* CoreTextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/CoreTextPaginator.swift"; sourceTree = "<group>"; };
+		100000881000008810000088 /* ReaderTextStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/ReaderTextStyler.swift"; sourceTree = "<group>"; };
 		100000151000001510000015 /* PageByteRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/PageByteRange.swift"; sourceTree = "<group>"; };
 		100000161000001610000016 /* ReadingLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/Pagination/ReadingLayout.swift"; sourceTree = "<group>"; };
 		100000171000001710000017 /* ReadingProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingProgress.swift"; sourceTree = "<group>"; };
@@ -260,6 +262,7 @@
 				100000121000001210000012 /* BookFileMapping.swift */,
 				100000131000001310000013 /* ReaderPageCache.swift */,
 				100000141000001410000014 /* CoreTextPaginator.swift */,
+				100000881000008810000088 /* ReaderTextStyler.swift */,
 				100000151000001510000015 /* PageByteRange.swift */,
 				100000161000001610000016 /* ReadingLayout.swift */,
 				100000371000003710000037 /* ReaderPage.swift */,
@@ -460,6 +463,7 @@
 				200000122000001220000012 /* BookFileMapping.swift in Sources */,
 				200000132000001320000013 /* ReaderPageCache.swift in Sources */,
 				200000142000001420000014 /* CoreTextPaginator.swift in Sources */,
+				200000852000008520000085 /* ReaderTextStyler.swift in Sources */,
 				200000152000001520000015 /* PageByteRange.swift in Sources */,
 				200000162000001620000016 /* ReadingLayout.swift in Sources */,
 				200000342000003420000034 /* ReaderPage.swift in Sources */,

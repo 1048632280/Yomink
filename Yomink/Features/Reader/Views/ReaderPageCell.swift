@@ -5,17 +5,26 @@ final class ReaderPageCell: UICollectionViewCell {
     static let reuseIdentifier = "ReaderPageCell"
 
     private let pageView = CoreTextPageView()
+    private let statusBarView = ReaderStatusBarView()
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         contentView.backgroundColor = YominkTheme.background
         pageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(pageView)
+        statusBarView.translatesAutoresizingMaskIntoConstraints = false
+        statusBarView.isHidden = true
+        contentView.addSubview(statusBarView)
         NSLayoutConstraint.activate([
             pageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             pageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             pageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            pageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            pageView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            statusBarView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            statusBarView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            statusBarView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            statusBarView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
         ])
     }
 
@@ -27,12 +36,25 @@ final class ReaderPageCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         pageView.configure(text: "", settings: .standard)
+        statusBarView.isHidden = true
     }
 
-    func configure(page: ReaderPage, settings: ReadingSettings, filterRules: [ContentFilterRule] = []) {
+    func configure(
+        page: ReaderPage,
+        settings: ReadingSettings,
+        filterRules: [ContentFilterRule] = [],
+        statusConfiguration: ReaderStatusBarView.Configuration? = nil
+    ) {
         let palette = ReadingThemePalette.palette(for: settings.theme)
         contentView.backgroundColor = palette.background
-        pageView.configure(text: page.text.applyingContentFilters(filterRules), settings: settings)
+        let displayText = page.text.applyingContentFilters(filterRules)
+        pageView.configure(text: displayText, settings: settings)
+        statusBarView.applyTheme(settings.theme)
+        if let statusConfiguration {
+            statusBarView.configure(statusConfiguration)
+        } else {
+            statusBarView.isHidden = true
+        }
     }
 }
 
@@ -90,14 +112,10 @@ private final class CoreTextPageView: UIView {
 
         let layout = settings.layout
         let palette = ReadingThemePalette.palette(for: settings.theme)
-        let font = CTFontCreateWithName(layout.fontName as CFString, layout.fontSize, nil)
-        let attributedString = NSAttributedString(
-            string: text,
-            attributes: [
-                NSAttributedString.Key(kCTFontAttributeName as String): font,
-                NSAttributedString.Key(kCTForegroundColorAttributeName as String): palette.primaryText.cgColor,
-                NSAttributedString.Key(kCTParagraphStyleAttributeName as String): makeParagraphStyle()
-            ]
+        let attributedString = ReaderTextStyler.attributedText(
+            for: text,
+            layout: layout,
+            foregroundColor: palette.primaryText.cgColor
         )
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
         let path = CGMutablePath()
@@ -107,28 +125,4 @@ private final class CoreTextPageView: UIView {
         context.restoreGState()
     }
 
-    private func makeParagraphStyle() -> CTParagraphStyle {
-        let layout = settings.layout
-        var lineSpacing = layout.lineSpacing
-        var paragraphSpacing = layout.paragraphSpacing
-        return withUnsafePointer(to: &lineSpacing) { lineSpacingPointer in
-            withUnsafePointer(to: &paragraphSpacing) { paragraphSpacingPointer in
-                let settings = [
-                    CTParagraphStyleSetting(
-                        spec: .lineSpacingAdjustment,
-                        valueSize: MemoryLayout<CGFloat>.size,
-                        value: UnsafeRawPointer(lineSpacingPointer)
-                    ),
-                    CTParagraphStyleSetting(
-                        spec: .paragraphSpacing,
-                        valueSize: MemoryLayout<CGFloat>.size,
-                        value: UnsafeRawPointer(paragraphSpacingPointer)
-                    )
-                ]
-                return settings.withUnsafeBufferPointer { buffer in
-                    CTParagraphStyleCreate(buffer.baseAddress, buffer.count)
-                }
-            }
-        }
-    }
 }
