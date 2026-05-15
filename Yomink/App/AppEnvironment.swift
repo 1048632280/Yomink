@@ -21,7 +21,10 @@ struct AppEnvironment {
         let appSettingsStore = AppSettingsStore()
         let readingSettingsStore = ReadingSettingsStore()
         let readingProgressStore = ReadingProgressStore(databaseManager: databaseManager)
-        let searchIndexService = SearchIndexService(databaseManager: databaseManager)
+        let searchIndexService = SearchIndexService(
+            databaseManager: databaseManager,
+            bookRepository: bookRepository
+        )
         let readerPageCache = ReaderPageCache()
         let bookImportService = BookImportService(bookRepository: bookRepository)
         let readingBookmarkService = ReadingBookmarkService(repository: bookmarkRepository)

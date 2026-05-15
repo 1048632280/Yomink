@@ -91,6 +91,28 @@ extension DatabaseMigrator {
             )
         }
 
+        migrator.registerMigration("createBookSearchIndex") { database in
+            try database.execute(
+                sql: """
+                CREATE VIRTUAL TABLE IF NOT EXISTS bookSearchIndex USING fts5(
+                    bookID UNINDEXED,
+                    chunkIndex UNINDEXED,
+                    startByteOffset UNINDEXED,
+                    endByteOffset UNINDEXED,
+                    content,
+                    tokenize = 'trigram'
+                )
+                """
+            )
+            try database.create(table: "bookSearchIndexStates", ifNotExists: true) { table in
+                table.column("bookID", .text).primaryKey()
+                table.column("indexedUntilByteOffset", .integer).notNull()
+                table.column("fileSize", .integer).notNull()
+                table.column("updatedAt", .double).notNull()
+                table.column("completedAt", .double)
+            }
+        }
+
         return migrator
     }
 }

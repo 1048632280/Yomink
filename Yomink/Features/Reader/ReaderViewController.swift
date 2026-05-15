@@ -10,6 +10,7 @@ final class ReaderViewController: UIViewController {
     private let pagingService: ReaderPagingService
     private let bookmarkService: ReadingBookmarkService
     private let chapterService: ReadingChapterService
+    private let searchIndexService: SearchIndexService
     private let readingSettingsStore: ReadingSettingsStore
     private let progressStore: ReadingProgressStore
     private let collectionView: UICollectionView
@@ -37,6 +38,7 @@ final class ReaderViewController: UIViewController {
         pagingService: ReaderPagingService,
         bookmarkService: ReadingBookmarkService,
         chapterService: ReadingChapterService,
+        searchIndexService: SearchIndexService,
         readingSettingsStore: ReadingSettingsStore,
         progressStore: ReadingProgressStore
     ) {
@@ -45,6 +47,7 @@ final class ReaderViewController: UIViewController {
         self.pagingService = pagingService
         self.bookmarkService = bookmarkService
         self.chapterService = chapterService
+        self.searchIndexService = searchIndexService
         self.readingSettingsStore = readingSettingsStore
         self.progressStore = progressStore
 
@@ -108,6 +111,7 @@ final class ReaderViewController: UIViewController {
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
         chapterService.cancelParsing(bookID: book.id)
+        searchIndexService.cancelIndexing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -324,7 +328,7 @@ final class ReaderViewController: UIViewController {
         case .bookmark:
             addBookmark()
         case .more:
-            showMorePlaceholder()
+            showMoreMenu()
         case .previousChapter:
             jumpToAdjacentChapter(direction: -1)
         case .nextChapter:
@@ -433,12 +437,20 @@ final class ReaderViewController: UIViewController {
         }
     }
 
-    private func showMorePlaceholder() {
+    private func showMoreMenu() {
         setChromeVisible(false, animated: true)
         let alert = UIAlertController(
             title: "\u{66F4}\u{591A}",
-            message: "\u{4E66}\u{7C4D}\u{8BE6}\u{60C5}\u{3001}\u{5185}\u{5BB9}\u{641C}\u{7D22}\u{548C}\u{8FC7}\u{6EE4}\u{5C06}\u{5728}\u{540E}\u{7EED}\u{9636}\u{6BB5}\u{63A5}\u{5165}\u{3002}",
+            message: nil,
             preferredStyle: .actionSheet
+        )
+        alert.addAction(
+            UIAlertAction(
+                title: "\u{5185}\u{5BB9}\u{641C}\u{7D22}",
+                style: .default
+            ) { [weak self] _ in
+                self?.showBookSearch()
+            }
         )
         alert.addAction(UIAlertAction(title: "\u{597D}", style: .cancel))
         if let popover = alert.popoverPresentationController {
@@ -452,6 +464,23 @@ final class ReaderViewController: UIViewController {
             popover.permittedArrowDirections = []
         }
         present(alert, animated: true)
+    }
+
+    private func showBookSearch() {
+        let searchViewController = BookSearchViewController(
+            book: book,
+            searchIndexService: searchIndexService
+        )
+        searchViewController.onResultSelected = { [weak self] result in
+            self?.jumpToByteOffset(result.byteOffset)
+        }
+
+        let navigationController = UINavigationController(rootViewController: searchViewController)
+        if let sheet = navigationController.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.prefersGrabberVisible = true
+        }
+        present(navigationController, animated: true)
     }
 
     private func refreshVisibleCellsForActiveSettings() {
@@ -529,6 +558,7 @@ final class ReaderViewController: UIViewController {
         refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: false)
         chapterService.scheduleParsing(bookID: book.id)
+        searchIndexService.scheduleIndexing(bookID: book.id, startingAt: page.startByteOffset)
         refreshChapters()
     }
 

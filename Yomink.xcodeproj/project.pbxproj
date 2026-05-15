@@ -68,6 +68,8 @@
 		200000592000005920000059 /* ChapterParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000621000006210000062 /* ChapterParserTests.swift */; };
 		200000602000006020000060 /* ChapterRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000631000006310000063 /* ChapterRepositoryTests.swift */; };
 		200000612000006120000061 /* ReaderChromeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000641000006410000064 /* ReaderChromeView.swift */; };
+		200000622000006220000062 /* BookSearchViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000651000006510000065 /* BookSearchViewController.swift */; };
+		200000632000006320000063 /* SearchIndexServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000661000006610000066 /* SearchIndexServiceTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -145,6 +147,8 @@
 		100000621000006210000062 /* ChapterParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ReaderEngineTests/ChapterParserTests.swift"; sourceTree = "<group>"; };
 		100000631000006310000063 /* ChapterRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/ChapterRepositoryTests.swift"; sourceTree = "<group>"; };
 		100000641000006410000064 /* ReaderChromeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/ReaderChromeView.swift"; sourceTree = "<group>"; };
+		100000651000006510000065 /* BookSearchViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/BookSearch/BookSearchViewController.swift"; sourceTree = "<group>"; };
+		100000661000006610000066 /* SearchIndexServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseTests/SearchIndexServiceTests.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -233,6 +237,7 @@
 				100000641000006410000064 /* ReaderChromeView.swift */,
 				100000501000005010000050 /* ReaderStatusBarView.swift */,
 				100000511000005110000051 /* ReaderSettingsViewController.swift */,
+				100000651000006510000065 /* BookSearchViewController.swift */,
 				100000561000005610000056 /* BookmarkListViewController.swift */,
 				100000611000006110000061 /* CatalogAndBookmarksViewController.swift */,
 				100000271000002710000027 /* PlaceholderView.swift */,
@@ -254,6 +259,7 @@
 				100000441000004410000044 /* ReadingProgressStoreTests.swift */,
 				100000451000004510000045 /* BookImportServiceTests.swift */,
 				100000571000005710000057 /* BookmarkRepositoryTests.swift */,
+				100000661000006610000066 /* SearchIndexServiceTests.swift */,
 				100000631000006310000063 /* ChapterRepositoryTests.swift */,
 				100000621000006210000062 /* ChapterParserTests.swift */,
 			);
@@ -410,6 +416,7 @@
 				200000612000006120000061 /* ReaderChromeView.swift in Sources */,
 				200000472000004720000047 /* ReaderStatusBarView.swift in Sources */,
 				200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */,
+				200000622000006220000062 /* BookSearchViewController.swift in Sources */,
 				200000532000005320000053 /* BookmarkListViewController.swift in Sources */,
 				200000582000005820000058 /* CatalogAndBookmarksViewController.swift in Sources */,
 				200000272000002720000027 /* PlaceholderView.swift in Sources */,
@@ -429,6 +436,7 @@
 				200000412000004120000041 /* ReadingProgressStoreTests.swift in Sources */,
 				200000422000004220000042 /* BookImportServiceTests.swift in Sources */,
 				200000542000005420000054 /* BookmarkRepositoryTests.swift in Sources */,
+				200000632000006320000063 /* SearchIndexServiceTests.swift in Sources */,
 				200000602000006020000060 /* ChapterRepositoryTests.swift in Sources */,
 				200000592000005920000059 /* ChapterParserTests.swift in Sources */,
 			);
