@@ -56,6 +56,18 @@ final class ReaderPageCell: UICollectionViewCell {
             statusBarView.isHidden = true
         }
     }
+
+    func configureStatus(
+        settings: ReadingSettings,
+        statusConfiguration: ReaderStatusBarView.Configuration?
+    ) {
+        statusBarView.applyTheme(settings.theme)
+        if let statusConfiguration {
+            statusBarView.configure(statusConfiguration)
+        } else {
+            statusBarView.isHidden = true
+        }
+    }
 }
 
 private extension String {

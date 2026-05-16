@@ -54,8 +54,8 @@ final class ReadingChapterService: @unchecked Sendable {
         lock.unlock()
     }
 
-    func chapters(bookID: UUID) async throws -> [ReadingChapter] {
-        try await Task.detached(priority: .userInitiated) { [chapterRepository] in
+    func chapters(bookID: UUID, priority: TaskPriority = .userInitiated) async throws -> [ReadingChapter] {
+        try await Task.detached(priority: priority) { [chapterRepository] in
             try chapterRepository.fetchChapters(bookID: bookID)
         }.value
     }

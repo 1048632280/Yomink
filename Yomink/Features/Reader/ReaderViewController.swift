@@ -159,7 +159,6 @@ final class ReaderViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        collectionView.collectionViewLayout.invalidateLayout()
         openFirstPageIfNeeded()
         reflowForViewportChangeIfNeeded()
     }
@@ -317,7 +316,7 @@ final class ReaderViewController: UIViewController {
     }
 
     @objc private func refreshVisibleReaderWidgets() {
-        refreshVisibleCellsForActiveSettings()
+        refreshVisibleStatusWidgets()
     }
 
     private func applyReadingSettings(_ settings: ReadingSettings) {
@@ -904,16 +903,23 @@ final class ReaderViewController: UIViewController {
     }
 
     private func chapterRange(containing byteOffset: UInt64) -> ChapterByteRange {
+        chapterRange(containing: byteOffset, in: chapters)
+    }
+
+    private func chapterRange(
+        containing byteOffset: UInt64,
+        in availableChapters: [ReadingChapter]
+    ) -> ChapterByteRange {
         let fileEnd = max(UInt64(1), book.fileSize)
         let readableByteOffset = min(byteOffset, fileEnd - 1)
-        guard !chapters.isEmpty else {
+        guard !availableChapters.isEmpty else {
             return ChapterByteRange(title: nil, startByteOffset: 0, endByteOffset: fileEnd)
         }
 
-        if let index = chapters.lastIndex(where: { $0.byteOffset <= readableByteOffset }) {
-            let chapter = chapters[index]
-            let rawEndByteOffset = chapters.indices.contains(index + 1)
-                ? chapters[index + 1].byteOffset
+        if let index = availableChapters.lastIndex(where: { $0.byteOffset <= readableByteOffset }) {
+            let chapter = availableChapters[index]
+            let rawEndByteOffset = availableChapters.indices.contains(index + 1)
+                ? availableChapters[index + 1].byteOffset
                 : fileEnd
             return ChapterByteRange(
                 title: chapter.title,
@@ -922,7 +928,7 @@ final class ReaderViewController: UIViewController {
             )
         }
 
-        let firstChapterStart = min(chapters[0].byteOffset, fileEnd)
+        let firstChapterStart = min(availableChapters[0].byteOffset, fileEnd)
         return ChapterByteRange(
             title: nil,
             startByteOffset: 0,
@@ -931,10 +937,17 @@ final class ReaderViewController: UIViewController {
     }
 
     private func chapterUpperBoundForPage(startingAt byteOffset: UInt64) -> UInt64? {
-        guard !chapters.isEmpty else {
+        chapterUpperBoundForPage(startingAt: byteOffset, in: chapters)
+    }
+
+    private func chapterUpperBoundForPage(
+        startingAt byteOffset: UInt64,
+        in availableChapters: [ReadingChapter]
+    ) -> UInt64? {
+        guard !availableChapters.isEmpty else {
             return nil
         }
-        return chapterRange(containing: byteOffset).endByteOffset
+        return chapterRange(containing: byteOffset, in: availableChapters).endByteOffset
     }
 
     private func chapterLowerBoundForPreviousPage(endingAt byteOffset: UInt64) -> UInt64? {
@@ -1053,17 +1066,28 @@ final class ReaderViewController: UIViewController {
             }
 
             var shouldReflowForChapterBoundaries = false
+            var didChangeChapters = false
             do {
-                let loadedChapters = try await chapterService.chapters(bookID: book.id)
-                shouldReflowForChapterBoundaries = !loadedChapters.isEmpty
-                    && loadedChapters != chapters
-                    && currentPage != nil
+                let loadedChapters = try await chapterService.chapters(bookID: book.id, priority: .utility)
+                guard !Task.isCancelled else {
+                    chapterRefreshTask = nil
+                    return
+                }
+                didChangeChapters = loadedChapters != chapters
+                let currentPageCrossesNewBoundary = currentPage.map {
+                    pageCrossesChapterBoundary($0, in: loadedChapters)
+                } ?? false
+                shouldReflowForChapterBoundaries = currentPageCrossesNewBoundary
                 chapters = loadedChapters
             } catch {
-                chapters = []
+                chapterRefreshTask = nil
+                return
             }
             chapterRefreshTask = nil
-            updateChrome()
+            if didChangeChapters {
+                updateChrome()
+                refreshVisibleStatusWidgets()
+            }
             if shouldReflowForChapterBoundaries {
                 reflowCurrentPageForChapterBoundaries()
             }
@@ -1090,8 +1114,12 @@ final class ReaderViewController: UIViewController {
                       !self.collectionView.isTracking else {
                     continue
                 }
+                if self.hasResolvedChapterBoundaryForCurrentPage() {
+                    break
+                }
                 self.refreshChapters()
             }
+            self.chapterBoundaryRefreshTask = nil
         }
     }
 
@@ -1104,9 +1132,29 @@ final class ReaderViewController: UIViewController {
         }
 
         updateCurrentPageFromVisiblePage()
-        let preferredByteOffset = currentPage?.startByteOffset
+        guard let currentPage,
+              pageCrossesChapterBoundary(currentPage) else {
+            return
+        }
+        let preferredByteOffset = currentPage.startByteOffset
         pagingService.removeCachedPages()
         openPage(preferredByteOffset: preferredByteOffset)
+    }
+
+    private func hasResolvedChapterBoundaryForCurrentPage() -> Bool {
+        guard let currentPage else {
+            return true
+        }
+
+        guard currentPage.endByteOffset < book.fileSize else {
+            return true
+        }
+
+        guard !pageCrossesChapterBoundary(currentPage) else {
+            return false
+        }
+
+        return chapters.contains { $0.byteOffset > currentPage.endByteOffset }
     }
 
     private func showMoreMenu() {
@@ -1339,6 +1387,8 @@ final class ReaderViewController: UIViewController {
     private func pauseBackgroundWork() {
         backgroundWorkResumeTask?.cancel()
         backgroundWorkResumeTask = nil
+        chapterRefreshTask?.cancel()
+        chapterRefreshTask = nil
         chapterBoundaryRefreshTask?.cancel()
         chapterBoundaryRefreshTask = nil
         chapterService.pauseParsing(bookID: book.id)
@@ -1387,6 +1437,20 @@ final class ReaderViewController: UIViewController {
         }
     }
 
+    private func refreshVisibleStatusWidgets() {
+        for indexPath in collectionView.indexPathsForVisibleItems {
+            guard pages.indices.contains(indexPath.item),
+                  let cell = collectionView.cellForItem(at: indexPath) as? ReaderPageCell else {
+                continue
+            }
+            let page = pages[indexPath.item]
+            cell.configureStatus(
+                settings: pageRenderingSettings,
+                statusConfiguration: statusConfiguration(for: page)
+            )
+        }
+    }
+
     private func openFirstPageIfNeeded() {
         guard !didStartOpening,
               collectionView.bounds.width > 1,
@@ -1423,6 +1487,7 @@ final class ReaderViewController: UIViewController {
         updateCurrentPageFromVisiblePage()
         let preferredByteOffset = currentPage?.startByteOffset
         activeSettings = activeSettings.normalized(viewportSize: collectionView.bounds.size)
+        collectionView.collectionViewLayout.invalidateLayout()
         pagingService.removeCachedPages()
         openPage(preferredByteOffset: preferredByteOffset)
     }
@@ -1463,23 +1528,29 @@ final class ReaderViewController: UIViewController {
     }
 
     private func openPage(preferredByteOffset: UInt64?, enforceChapterBoundary: Bool = true) {
+        let existingByteOffset = currentPage?.startByteOffset
+        let shouldClearImmediately = pages.isEmpty
         openingTask?.cancel()
         previousPageTask?.cancel()
         nextPageTask?.cancel()
+        chapterRefreshTask?.cancel()
         chapterBoundaryRefreshTask?.cancel()
+        chapterRefreshTask = nil
         chapterBoundaryRefreshTask = nil
         previousPageTask = nil
         nextPageTask = nil
         pendingTapPageTurnTargetPageIndex = nil
         isLoadingNextPage = false
-        pages = []
-        currentPage = nil
-        resetBookmarkState()
-        applyPagesSnapshot()
+        if shouldClearImmediately {
+            pages = []
+            currentPage = nil
+            resetBookmarkState()
+            applyPagesSnapshot()
+        }
         didReachEndOfBook = false
         pagingGeneration += 1
         let generation = pagingGeneration
-        let requestStartByteOffset = preferredByteOffset ?? currentPage?.startByteOffset ?? 0
+        let requestStartByteOffset = preferredByteOffset ?? existingByteOffset ?? 0
         let shouldEnforceChapterBoundary = enforceChapterBoundary && preferredByteOffset != nil
         let request = ReaderOpeningRequest(
             bookID: book.id,
@@ -1530,11 +1601,11 @@ final class ReaderViewController: UIViewController {
                 }
                 chapters = loadedChapters
                 updateChrome()
+                refreshVisibleStatusWidgets()
             } catch {
                 guard pagingGeneration == generation else {
                     return
                 }
-                chapters = []
             }
 
             if let currentPage,
@@ -1549,7 +1620,17 @@ final class ReaderViewController: UIViewController {
     }
 
     private func pageCrossesChapterBoundary(_ page: ReaderPage) -> Bool {
-        guard let upperBound = chapterUpperBoundForPage(startingAt: page.startByteOffset) else {
+        pageCrossesChapterBoundary(page, in: chapters)
+    }
+
+    private func pageCrossesChapterBoundary(
+        _ page: ReaderPage,
+        in availableChapters: [ReadingChapter]
+    ) -> Bool {
+        guard let upperBound = chapterUpperBoundForPage(
+            startingAt: page.startByteOffset,
+            in: availableChapters
+        ) else {
             return false
         }
         return page.endByteOffset > upperBound
@@ -1559,7 +1640,7 @@ final class ReaderViewController: UIViewController {
         pages = [page]
         currentPage = page
         applyPagesSnapshot()
-        refreshVisibleCellsForActiveSettings()
+        refreshVisibleStatusWidgets()
         updateSessionState(isLoadingNextPage: false)
         chapterService.scheduleParsing(bookID: book.id)
         searchIndexService.scheduleIndexing(bookID: book.id, startingAt: page.startByteOffset)
@@ -1575,7 +1656,7 @@ final class ReaderViewController: UIViewController {
         let removedPrefixCount = trimResidentPagesIfNeeded()
         applyPagesSnapshot()
         adjustContentOffsetAfterRemovingPrefix(removedPrefixCount)
-        refreshVisibleCellsForActiveSettings()
+        refreshVisibleStatusWidgets()
         updateSessionState(isLoadingNextPage: false)
         return pages.firstIndex(of: page)
     }
@@ -1609,7 +1690,7 @@ final class ReaderViewController: UIViewController {
                 collectionView.setContentOffset(adjustedOffset, animated: false)
             }
         }
-        refreshVisibleCellsForActiveSettings()
+        refreshVisibleStatusWidgets()
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
         return pages.firstIndex(of: page)
     }
@@ -2088,6 +2169,10 @@ final class ReaderViewController: UIViewController {
 
 extension ReaderViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        guard collectionView.isDragging || collectionView.isDecelerating || isAutoReading else {
+            return
+        }
+
         guard pages.indices.contains(indexPath.item) else {
             return
         }
