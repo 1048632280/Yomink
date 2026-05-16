@@ -52,6 +52,7 @@ final class ReaderSettingsViewController: UIViewController {
     )
     private let keepAwakeSwitch = UISwitch()
     private let homeIndicatorSwitch = UISwitch()
+    private let systemStatusBarSwitch = UISwitch()
     private let swipeBackSwitch = UISwitch()
     private var numericFields: [NumericField: UITextField] = [:]
     private var statusSwitches: [ReadingStatusBarItem: UISwitch] = [:]
@@ -113,6 +114,15 @@ final class ReaderSettingsViewController: UIViewController {
                     return
                 }
                 pendingSettings.autoHideHomeIndicator = homeIndicatorSwitch.isOn
+            },
+            for: .valueChanged
+        )
+        systemStatusBarSwitch.addAction(
+            UIAction { [weak self] _ in
+                guard let self else {
+                    return
+                }
+                pendingSettings.hideSystemStatusBar = systemStatusBarSwitch.isOn
             },
             for: .valueChanged
         )
@@ -299,6 +309,10 @@ final class ReaderSettingsViewController: UIViewController {
                 toggle: homeIndicatorSwitch
             ))
             detailStack.addArrangedSubview(makeSwitchRow(
+                title: "\u{9690}\u{85CF}\u{7CFB}\u{7EDF}\u{72B6}\u{6001}\u{680F}",
+                toggle: systemStatusBarSwitch
+            ))
+            detailStack.addArrangedSubview(makeSwitchRow(
                 title: "\u{4FA7}\u{6ED1}\u{8FD4}\u{56DE}",
                 toggle: swipeBackSwitch
             ))
@@ -458,6 +472,7 @@ final class ReaderSettingsViewController: UIViewController {
         ) ?? 0
         keepAwakeSwitch.isOn = pendingSettings.keepScreenAwake
         homeIndicatorSwitch.isOn = pendingSettings.autoHideHomeIndicator
+        systemStatusBarSwitch.isOn = pendingSettings.hideSystemStatusBar
         swipeBackSwitch.isOn = pendingSettings.allowsSwipeBack
 
         for (item, toggle) in statusSwitches {

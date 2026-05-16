@@ -115,6 +115,14 @@ final class ReaderViewController: UIViewController {
         activeSettings.autoHideHomeIndicator ? .bottom : []
     }
 
+    override var prefersStatusBarHidden: Bool {
+        activeSettings.hideSystemStatusBar && !isChromeVisible && !isAutoReadPanelVisible
+    }
+
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
+        .fade
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         title = book.title
@@ -352,9 +360,15 @@ final class ReaderViewController: UIViewController {
         UIDevice.current.isBatteryMonitoringEnabled = activeSettings.statusBarItems.contains(.battery)
             || activeSettings.statusBarItems.contains(.batteryPercent)
         requestHomeIndicatorDormancy()
+        requestSystemStatusBarAppearanceUpdate()
         configureSwipeBackGesture()
         configureCollectionViewForActiveSettings()
         refreshVisibleCellsForActiveSettings()
+    }
+
+    private func requestSystemStatusBarAppearanceUpdate() {
+        setNeedsStatusBarAppearanceUpdate()
+        navigationController?.setNeedsStatusBarAppearanceUpdate()
     }
 
     private func requestHomeIndicatorDormancy(after delay: TimeInterval = 0) {
@@ -682,11 +696,13 @@ final class ReaderViewController: UIViewController {
         }
         isChromeVisible = isVisible
         updateChrome()
+        requestSystemStatusBarAppearanceUpdate()
         chromeView.setVisible(isVisible, animated: animated)
     }
 
     private func setAutoReadPanelVisible(_ isVisible: Bool, animated: Bool) {
         isAutoReadPanelVisible = isVisible
+        requestSystemStatusBarAppearanceUpdate()
         autoReadPanelView.setVisible(isVisible, animated: animated)
     }
 

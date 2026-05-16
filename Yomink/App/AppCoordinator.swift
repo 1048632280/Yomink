@@ -155,4 +155,8 @@ private final class YominkNavigationController: UINavigationController {
     override var childForScreenEdgesDeferringSystemGestures: UIViewController? {
         topViewController
     }
+
+    override var childForStatusBarHidden: UIViewController? {
+        topViewController
+    }
 }

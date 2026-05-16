@@ -104,6 +104,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
     var layoutDensity: ReadingLayoutDensity
     var keepScreenAwake: Bool
     var autoHideHomeIndicator: Bool
+    var hideSystemStatusBar: Bool
     var allowsSwipeBack: Bool
     var statusBarItems: Set<ReadingStatusBarItem>
 
@@ -114,6 +115,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         layoutDensity: .standard,
         keepScreenAwake: false,
         autoHideHomeIndicator: false,
+        hideSystemStatusBar: true,
         allowsSwipeBack: false,
         statusBarItems: []
     )
@@ -125,6 +127,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         layoutDensity: ReadingLayoutDensity,
         keepScreenAwake: Bool,
         autoHideHomeIndicator: Bool,
+        hideSystemStatusBar: Bool,
         allowsSwipeBack: Bool,
         statusBarItems: Set<ReadingStatusBarItem>
     ) {
@@ -134,6 +137,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         self.layoutDensity = layoutDensity
         self.keepScreenAwake = keepScreenAwake
         self.autoHideHomeIndicator = autoHideHomeIndicator
+        self.hideSystemStatusBar = hideSystemStatusBar
         self.allowsSwipeBack = allowsSwipeBack
         self.statusBarItems = statusBarItems
     }
@@ -145,6 +149,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         case layoutDensity
         case keepScreenAwake
         case autoHideHomeIndicator
+        case hideSystemStatusBar
         case allowsSwipeBack
         case statusBarItems
     }
@@ -164,6 +169,7 @@ struct ReadingSettings: Hashable, Codable, Sendable {
         ) ?? (layout == defaults.layout ? defaults.layoutDensity : .custom)
         keepScreenAwake = try container.decodeIfPresent(Bool.self, forKey: .keepScreenAwake) ?? false
         autoHideHomeIndicator = try container.decodeIfPresent(Bool.self, forKey: .autoHideHomeIndicator) ?? false
+        hideSystemStatusBar = try container.decodeIfPresent(Bool.self, forKey: .hideSystemStatusBar) ?? true
         allowsSwipeBack = try container.decodeIfPresent(Bool.self, forKey: .allowsSwipeBack) ?? false
         statusBarItems = try container.decodeIfPresent(
             Set<ReadingStatusBarItem>.self,

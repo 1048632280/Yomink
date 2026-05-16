@@ -7,6 +7,7 @@ final class SettingsModelTests: XCTestCase {
         let settings = ReadingSettings.standard
 
         XCTAssertEqual(settings.theme, .paper)
+        XCTAssertTrue(settings.hideSystemStatusBar)
         XCTAssertFalse(settings.allowsSwipeBack)
         XCTAssertGreaterThan(settings.layout.fontSize, 0)
         XCTAssertGreaterThan(settings.layout.viewportSize.width, 0)
