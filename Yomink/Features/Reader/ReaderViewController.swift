@@ -203,7 +203,6 @@ final class ReaderViewController: UIViewController {
         chapterBoundaryRefreshTask?.cancel()
         bookmarkStateTask?.cancel()
         backgroundWorkResumeTask?.cancel()
-        pendingHomeIndicatorUpdate?.cancel()
         chapterService.cancelParsing(bookID: book.id)
         searchIndexService.cancelIndexing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
