@@ -11,10 +11,10 @@ struct ReadingThemePalette {
         switch theme {
         case .paper:
             return ReadingThemePalette(
-                background: UIColor(red: 0.96, green: 0.95, blue: 0.92, alpha: 1),
+                background: ReadingPaperTexture.backgroundColor(),
                 primaryText: UIColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1),
                 secondaryText: UIColor(red: 0.42, green: 0.43, blue: 0.44, alpha: 1),
-                chromeBackground: UIColor(red: 0.96, green: 0.95, blue: 0.92, alpha: 0.86)
+                chromeBackground: UIColor(red: 0.968, green: 0.967, blue: 0.952, alpha: 0.88)
             )
         case .white:
             return ReadingThemePalette(

@@ -57,6 +57,7 @@
 		200000472000004720000047 /* ReaderStatusBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000501000005010000050 /* ReaderStatusBarView.swift */; };
 		200000482000004820000048 /* ReaderSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000511000005110000051 /* ReaderSettingsViewController.swift */; };
 		200000492000004920000049 /* ReadingThemePalette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000521000005210000052 /* ReadingThemePalette.swift */; };
+		200000862000008620000086 /* ReadingPaperTexture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000891000008910000089 /* ReadingPaperTexture.swift */; };
 		200000742000007420000074 /* AutoReadSpeedPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000771000007710000077 /* AutoReadSpeedPanelView.swift */; };
 		200000502000005020000050 /* ReadingBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000531000005310000053 /* ReadingBookmark.swift */; };
 		200000512000005120000051 /* BookmarkRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000541000005410000054 /* BookmarkRepository.swift */; };
@@ -158,6 +159,7 @@
 		100000501000005010000050 /* ReaderStatusBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/ReaderStatusBarView.swift"; sourceTree = "<group>"; };
 		100000511000005110000051 /* ReaderSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/ReaderMenu/ReaderSettingsViewController.swift"; sourceTree = "<group>"; };
 		100000521000005210000052 /* ReadingThemePalette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Themes/ReadingThemePalette.swift"; sourceTree = "<group>"; };
+		100000891000008910000089 /* ReadingPaperTexture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UI/Themes/ReadingPaperTexture.swift"; sourceTree = "<group>"; };
 		100000771000007710000077 /* AutoReadSpeedPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Features/Reader/Views/AutoReadSpeedPanelView.swift"; sourceTree = "<group>"; };
 		100000531000005310000053 /* ReadingBookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/ReaderEngine/ProgressLocator/ReadingBookmark.swift"; sourceTree = "<group>"; };
 		100000541000005410000054 /* BookmarkRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Core/Database/Repositories/BookmarkRepository.swift"; sourceTree = "<group>"; };
@@ -308,6 +310,7 @@
 				100000271000002710000027 /* PlaceholderView.swift */,
 				100000281000002810000028 /* YominkTheme.swift */,
 				100000521000005210000052 /* ReadingThemePalette.swift */,
+				100000891000008910000089 /* ReadingPaperTexture.swift */,
 				100000291000002910000029 /* Assets.xcassets */,
 				100000301000003010000030 /* LaunchScreen.storyboard */,
 			);
@@ -509,6 +512,7 @@
 				200000272000002720000027 /* PlaceholderView.swift in Sources */,
 				200000282000002820000028 /* YominkTheme.swift in Sources */,
 				200000492000004920000049 /* ReadingThemePalette.swift in Sources */,
+				200000862000008620000086 /* ReadingPaperTexture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
