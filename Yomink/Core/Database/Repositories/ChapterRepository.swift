@@ -114,6 +114,29 @@ final class ChapterRepository: @unchecked Sendable {
         }
     }
 
+    func fetchChapterPrefix(bookID: UUID, limit: Int) throws -> [ReadingChapter] {
+        guard limit > 0 else {
+            return []
+        }
+        guard let writer = databaseManager.writer else {
+            return []
+        }
+
+        return try writer.read { database in
+            try Row.fetchAll(
+                database,
+                sql: """
+                SELECT id, bookID, title, byteOffset, sortIndex, createdAt
+                FROM chapters
+                WHERE bookID = ?
+                ORDER BY byteOffset ASC, sortIndex ASC
+                LIMIT ?
+                """,
+                arguments: [bookID.uuidString, limit]
+            ).map(ReadingChapter.init(databaseRow:))
+        }
+    }
+
     func fetchParsingState(bookID: UUID) throws -> ChapterParseState? {
         guard let writer = databaseManager.writer else {
             return nil

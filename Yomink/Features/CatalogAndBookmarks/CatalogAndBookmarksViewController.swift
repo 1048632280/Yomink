@@ -47,6 +47,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private var pendingSnapshotUpdate: Bool?
     private var pendingScrollToTopAfterSnapshot = false
     private var isClosing = false
+    private var highlightedChapterID: UUID?
     private let searchBar = UISearchBar(frame: .zero)
     private var searchBarHeightConstraint: NSLayoutConstraint?
     private lazy var edgeJumpButton = UIBarButtonItem(
@@ -77,6 +78,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
         self.bookmarks = bookmarks
         self.chapterStatus = snapshot.status
         self.currentByteOffset = currentByteOffset
+        self.highlightedChapterID = Self.currentChapterID(in: snapshot.chapters, currentByteOffset: currentByteOffset)
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -104,6 +106,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
         }
         chapters = snapshot.chapters
         chapterStatus = snapshot.status
+        highlightedChapterID = Self.currentChapterID(in: chapters, currentByteOffset: currentByteOffset)
         guard isViewLoaded else {
             return
         }
@@ -190,7 +193,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
             case .chapter(let chapter, let displayIndex):
                 content.text = "\(displayIndex).\(chapter.title)"
                 content.secondaryText = nil
-                let isCurrentChapter = self?.currentChapterID().map { $0 == chapter.id } ?? false
+                let isCurrentChapter = self?.highlightedChapterID.map { $0 == chapter.id } ?? false
                 content.textProperties.color = isCurrentChapter ? .systemRed : YominkTheme.primaryText
                 cell.accessories = [.disclosureIndicator()]
             case .bookmark(let bookmark):
@@ -294,16 +297,20 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private func filteredChapters() -> [(chapter: ReadingChapter, displayIndex: Int)] {
-        let indexedChapters = chapters.enumerated().map { index, chapter in
-            (chapter: chapter, displayIndex: index + 1)
-        }
         let query = chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else {
-            return indexedChapters
+            return chapters.enumerated().map { index, chapter in
+                (chapter: chapter, displayIndex: index + 1)
+            }
         }
-        return indexedChapters.filter { item in
-            item.chapter.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+
+        var filteredItems: [(chapter: ReadingChapter, displayIndex: Int)] = []
+        filteredItems.reserveCapacity(min(chapters.count, 64))
+        for (index, chapter) in chapters.enumerated()
+            where chapter.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+            filteredItems.append((chapter: chapter, displayIndex: index + 1))
         }
+        return filteredItems
     }
 
     @objc private func segmentChanged() {
@@ -345,8 +352,12 @@ final class CatalogAndBookmarksViewController: UIViewController {
         return chapters.lastIndex { $0.byteOffset <= currentByteOffset }
     }
 
-    private func currentChapterID() -> UUID? {
-        currentChapterIndex().map { chapters[$0].id }
+    private static func currentChapterID(in chapters: [ReadingChapter], currentByteOffset: UInt64?) -> UUID? {
+        guard let currentByteOffset,
+              let index = chapters.lastIndex(where: { $0.byteOffset <= currentByteOffset }) else {
+            return nil
+        }
+        return chapters[index].id
     }
 
     private func scrollToCurrentChapterIfNeeded() {
@@ -405,7 +416,13 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private var canScrollEdgeJump: Bool {
         switch selectedSegment {
         case .chapters:
-            return !filteredChapters().isEmpty
+            let query = chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !query.isEmpty else {
+                return !chapters.isEmpty
+            }
+            return chapters.contains { chapter in
+                chapter.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+            }
         case .bookmarks:
             return !bookmarks.isEmpty
         }
@@ -575,11 +592,19 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
 
         switch item {
         case .chapter(let chapter, _):
-            onChapterSelected?(chapter)
-            closePage(animated: false)
+            let chapterSelection = onChapterSelected
+            closePage(animated: false) {
+                DispatchQueue.main.async {
+                    chapterSelection?(chapter)
+                }
+            }
         case .bookmark(let bookmark):
-            onBookmarkSelected?(bookmark)
-            closePage(animated: false)
+            let bookmarkSelection = onBookmarkSelected
+            closePage(animated: false) {
+                DispatchQueue.main.async {
+                    bookmarkSelection?(bookmark)
+                }
+            }
         case .empty:
             return
         }

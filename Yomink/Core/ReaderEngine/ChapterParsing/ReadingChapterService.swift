@@ -4,7 +4,10 @@ import Foundation
 final class ReadingChapterService: @unchecked Sendable {
     private static let parseYieldDelayNanoseconds: UInt64 = 4_000_000
 
-    let chapterUpdates = PassthroughSubject<UUID, Never>()
+    private let chapterUpdatesSubject = PassthroughSubject<UUID, Never>()
+    var chapterUpdates: AnyPublisher<UUID, Never> {
+        chapterUpdatesSubject.eraseToAnyPublisher()
+    }
 
     private let bookRepository: BookRepository
     private let chapterRepository: ChapterRepository
@@ -111,7 +114,7 @@ final class ReadingChapterService: @unchecked Sendable {
                     completedAt: Date(),
                     failureReason: nil
                 )
-                chapterUpdates.send(bookID)
+                notifyChapterUpdate(bookID: bookID)
                 return
             }
 
@@ -153,7 +156,7 @@ final class ReadingChapterService: @unchecked Sendable {
                     failureReason: nil
                 )
                 if isRetryingFailure {
-                    chapterUpdates.send(bookID)
+                    notifyChapterUpdate(bookID: bookID)
                 }
             }
 
@@ -210,7 +213,7 @@ final class ReadingChapterService: @unchecked Sendable {
                 nextSortIndex = try chapterRepository.insertChapters(pendingChapters, state: state)
 
                 if !pendingChapters.isEmpty || didComplete {
-                    chapterUpdates.send(bookID)
+                    notifyChapterUpdate(bookID: bookID)
                 }
 
                 guard !didComplete else {
@@ -239,7 +242,13 @@ final class ReadingChapterService: @unchecked Sendable {
                 completedAt: nil,
                 failureReason: String(describing: error)
             )
-            chapterUpdates.send(bookID)
+            notifyChapterUpdate(bookID: bookID)
+        }
+    }
+
+    private func notifyChapterUpdate(bookID: UUID) {
+        DispatchQueue.main.async { [self] in
+            chapterUpdatesSubject.send(bookID)
         }
     }
 

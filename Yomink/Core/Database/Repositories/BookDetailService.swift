@@ -20,11 +20,11 @@ final class BookDetailService: @unchecked Sendable {
             guard let book = try bookRepository.fetchBook(id: bookID) else {
                 return nil
             }
-            let chapters = try chapterRepository.fetchChapters(bookID: bookID)
+            let chapters = try chapterRepository.fetchChapterPrefix(bookID: bookID, limit: 20)
             return BookDetailSummary(
                 book: book,
                 estimatedCharacterCount: Self.estimatedCharacterCount(fileSize: book.fileSize, encoding: book.encoding),
-                chapters: Array(chapters.prefix(20))
+                chapters: chapters
             )
         }.value
     }
