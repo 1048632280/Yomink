@@ -81,6 +81,7 @@ final class ReaderViewController: UIViewController {
         guard isAutoReading else {
             return settings
         }
+        // Auto-read scrolls only the body strip between the fixed widgets; each cell is exactly that strip height.
         settings.layout.contentInsets.top = 0
         settings.layout.contentInsets.bottom = 0
         return settings
@@ -302,7 +303,7 @@ final class ReaderViewController: UIViewController {
         ])
         autoReadPanelView.configure(speed: autoReadSpeed, theme: activeSettings.theme)
         autoReadPanelView.onSpeedChanged = { [weak self] speed in
-            self?.autoReadSpeed = speed
+            self?.autoReadSpeed = min(240, max(12, speed))
         }
         autoReadPanelView.onExit = { [weak self] in
             self?.stopAutoReading()
@@ -508,6 +509,8 @@ final class ReaderViewController: UIViewController {
             collectionView.isPagingEnabled = false
             collectionView.alwaysBounceVertical = true
         }
+        collectionView.contentInset = .zero
+        collectionView.scrollIndicatorInsets = .zero
         layout.invalidateLayout()
         collectionView.layoutIfNeeded()
     }
@@ -785,6 +788,7 @@ final class ReaderViewController: UIViewController {
 
         pauseBackgroundWork()
         setChromeVisible(false, animated: true)
+        autoReadSpeed = min(240, max(12, autoReadSpeed))
         isAutoReading = true
         autoReadStatusBarView.isHidden = false
         updateAutoReadStatusBar()
@@ -821,9 +825,17 @@ final class ReaderViewController: UIViewController {
             return
         }
 
+        let readingLayout = effectiveReadingLayout(from: activeSettings)
         layout.scrollDirection = .vertical
         collectionView.isPagingEnabled = false
         collectionView.alwaysBounceVertical = true
+        collectionView.contentInset = UIEdgeInsets(
+            top: readingLayout.contentInsets.top,
+            left: 0,
+            bottom: readingLayout.contentInsets.bottom,
+            right: 0
+        )
+        collectionView.scrollIndicatorInsets = collectionView.contentInset
         layout.invalidateLayout()
         collectionView.layoutIfNeeded()
     }
@@ -871,12 +883,16 @@ final class ReaderViewController: UIViewController {
             return
         }
 
+        autoReadSpeed = min(240, max(12, autoReadSpeed))
         let distance = autoReadSpeed * CGFloat(interval)
         guard distance > 0 else {
             return
         }
 
-        let maxOffsetY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
+        let maxOffsetY = max(
+            -collectionView.contentInset.top,
+            collectionView.contentSize.height + collectionView.contentInset.bottom - collectionView.bounds.height
+        )
         let nextOffsetY = min(maxOffsetY, collectionView.contentOffset.y + distance)
         collectionView.setContentOffset(
             CGPoint(x: collectionView.contentOffset.x, y: nextOffsetY),
@@ -884,12 +900,12 @@ final class ReaderViewController: UIViewController {
         )
         updateCurrentPageFromVisiblePage()
 
-        if nextOffsetY >= max(0, maxOffsetY - collectionView.bounds.height * 1.6) {
+        if nextOffsetY >= max(-collectionView.contentInset.top, maxOffsetY - autoReadPageHeight() * 1.6) {
             loadNextPageIfNeeded()
         }
 
-        if nextOffsetY >= maxOffsetY,
-           didReachEndOfBook || (pages.last?.endByteOffset ?? 0) >= book.fileSize {
+        if nextOffsetY >= maxOffsetY
+            && (didReachEndOfBook || (pages.last?.endByteOffset ?? 0) >= book.fileSize) {
             stopAutoReading()
         }
     }
@@ -902,7 +918,8 @@ final class ReaderViewController: UIViewController {
 
         let targetOffset: CGPoint
         if usesVerticalScrolling {
-            targetOffset = CGPoint(x: 0, y: CGFloat(currentIndex) * pageExtentForCurrentMode())
+            let insetTop = isAutoReading ? collectionView.contentInset.top : 0
+            targetOffset = CGPoint(x: 0, y: CGFloat(currentIndex) * pageExtentForCurrentMode() - insetTop)
         } else {
             targetOffset = CGPoint(x: CGFloat(currentIndex) * pageExtentForCurrentMode(), y: 0)
         }
@@ -1994,7 +2011,10 @@ final class ReaderViewController: UIViewController {
         }
 
         if isAutoReading {
-            let centeredOffset = collectionView.contentOffset.y + collectionView.bounds.height * 0.5
+            let visibleBodyHeight = autoReadPageHeight()
+            let centeredOffset = collectionView.contentOffset.y
+                + collectionView.contentInset.top
+                + visibleBodyHeight * 0.5
             let index = Int(floor(centeredOffset / pageLength))
             return min(max(index, 0), pages.count - 1)
         }
@@ -2244,7 +2264,8 @@ final class ReaderViewController: UIViewController {
 
     private func contentOffset(forPageAt index: Int) -> CGPoint {
         if usesVerticalScrolling {
-            return CGPoint(x: 0, y: CGFloat(index) * pageExtentForCurrentMode())
+            let insetTop = isAutoReading ? collectionView.contentInset.top : 0
+            return CGPoint(x: 0, y: CGFloat(index) * pageExtentForCurrentMode() - insetTop)
         }
 
         return CGPoint(x: CGFloat(index) * pageExtentForCurrentMode(), y: 0)
@@ -2334,10 +2355,16 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
 
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         finishPageTurn()
+        if isAutoReading {
+            lastAutoReadFrameTimestamp = nil
+        }
     }
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         finishPageTurn()
+        if isAutoReading {
+            lastAutoReadFrameTimestamp = nil
+        }
     }
 
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
@@ -2346,6 +2373,9 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         }
 
         finishPageTurn()
+        if isAutoReading {
+            lastAutoReadFrameTimestamp = nil
+        }
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -2353,9 +2383,6 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         pendingHomeIndicatorUpdate?.cancel()
         pendingHomeIndicatorUpdate = nil
         pauseBackgroundWork()
-        if isAutoReading {
-            stopAutoReading()
-        }
     }
 
     func collectionView(

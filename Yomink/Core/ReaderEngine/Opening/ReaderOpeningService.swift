@@ -50,11 +50,17 @@ final class ReaderOpeningService: @unchecked Sendable {
                 byteRange: windowStart..<windowEnd,
                 text: decodedWindow.text.prefixUTF16Units(CoreTextPaginator.maximumUTF16Length)
             )
+            let startsAtParagraphBoundary = try Self.startsAtParagraphBoundary(
+                mapping: mapping,
+                requestedStartByteOffset: clampedStart,
+                encoding: book.encoding
+            )
             let pagination = try CoreTextPaginator().paginateFirstPageWithText(
                 window: textWindow,
                 layout: layout,
                 bookID: book.id,
-                encoding: book.encoding
+                encoding: book.encoding,
+                startsAtParagraphBoundary: startsAtParagraphBoundary
             )
             guard !pagination.text.isEmpty else {
                 throw ReaderOpeningError.emptyVisiblePage
@@ -64,12 +70,34 @@ final class ReaderOpeningService: @unchecked Sendable {
                 bookID: book.id,
                 pageIndex: pagination.pageByteRange.pageIndex,
                 byteRange: pagination.pageByteRange.byteRange,
-                text: pagination.text
+                text: pagination.text,
+                startsAtParagraphBoundary: pagination.startsAtParagraphBoundary
             )
 
             try bookRepository.updateLastReadAt(bookID: book.id)
             return ReaderOpeningResult(book: book, page: page, progress: progress)
         }.value
+    }
+
+    private static func startsAtParagraphBoundary(
+        mapping: BookFileMapping,
+        requestedStartByteOffset: UInt64,
+        encoding: TextEncoding
+    ) throws -> Bool {
+        guard requestedStartByteOffset > 0 else {
+            return true
+        }
+
+        let probeLength = min(UInt64(16), requestedStartByteOffset)
+        let probeStart = requestedStartByteOffset - probeLength
+        let probeData = try mapping.bytes(in: probeStart..<requestedStartByteOffset)
+        let decoder = TextDecoder()
+        let probeText = (try? decoder.decodeBoundedWindow(data: probeData, encoding: encoding).text)
+            ?? String(data: probeData, encoding: encoding.stringEncoding)
+        guard let previousCharacter = probeText?.last else {
+            return true
+        }
+        return previousCharacter.isNewline
     }
 }
 

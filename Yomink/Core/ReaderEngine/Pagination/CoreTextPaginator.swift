@@ -11,6 +11,7 @@ enum PaginationError: Error {
 struct PaginatedFirstPage: Hashable, Sendable {
     let pageByteRange: PageByteRange
     let text: String
+    let startsAtParagraphBoundary: Bool
 }
 
 struct CoreTextPaginator {
@@ -33,14 +34,16 @@ struct CoreTextPaginator {
         window: TextWindow,
         layout: ReadingLayout,
         bookID: UUID,
-        encoding: TextEncoding
+        encoding: TextEncoding,
+        startsAtParagraphBoundary: Bool = true
     ) throws -> PaginatedFirstPage {
         try paginatePageWithText(
             window: window,
             layout: layout,
             bookID: bookID,
             pageIndex: 0,
-            encoding: encoding
+            encoding: encoding,
+            startsAtParagraphBoundary: startsAtParagraphBoundary
         )
     }
 
@@ -49,7 +52,8 @@ struct CoreTextPaginator {
         layout: ReadingLayout,
         bookID: UUID,
         pageIndex: Int,
-        encoding: TextEncoding
+        encoding: TextEncoding,
+        startsAtParagraphBoundary: Bool = true
     ) throws -> PaginatedFirstPage {
         guard !Thread.isMainThread else {
             assertionFailure("CoreText pagination must not run on the main thread.")
@@ -62,7 +66,11 @@ struct CoreTextPaginator {
             throw PaginationError.windowTooLarge
         }
 
-        let attributedString = ReaderTextStyler.attributedText(for: window.text, layout: layout)
+        let attributedString = ReaderTextStyler.attributedText(
+            for: window.text,
+            layout: layout,
+            startsAtParagraphBoundary: startsAtParagraphBoundary
+        )
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
         let path = CGMutablePath()
         let textRect = layout.contentRect(
@@ -83,7 +91,11 @@ struct CoreTextPaginator {
             pageIndex: pageIndex,
             byteRange: window.startByteOffset..<estimatedEndOffset
         )
-        return PaginatedFirstPage(pageByteRange: pageByteRange, text: visibleText)
+        return PaginatedFirstPage(
+            pageByteRange: pageByteRange,
+            text: visibleText,
+            startsAtParagraphBoundary: startsAtParagraphBoundary
+        )
     }
 
     private func estimateByteOffset(visibleText: String, window: TextWindow, encoding: TextEncoding) -> UInt64 {

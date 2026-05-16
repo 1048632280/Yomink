@@ -3,12 +3,21 @@ import CoreText
 import Foundation
 
 enum ReaderTextStyler {
-    static func attributedText(for text: String, layout: ReadingLayout, foregroundColor: CGColor? = nil) -> NSAttributedString {
+    static func attributedText(
+        for text: String,
+        layout: ReadingLayout,
+        foregroundColor: CGColor? = nil,
+        startsAtParagraphBoundary: Bool = true
+    ) -> NSAttributedString {
         let attributedString = NSMutableAttributedString(
             string: text,
             attributes: bodyAttributes(layout: layout, foregroundColor: foregroundColor)
         )
-        applyBodyParagraphStyle(to: attributedString, layout: layout)
+        applyBodyParagraphStyle(
+            to: attributedString,
+            layout: layout,
+            startsAtParagraphBoundary: startsAtParagraphBoundary
+        )
         applyChapterTitleStyle(to: attributedString, layout: layout, foregroundColor: foregroundColor)
         return attributedString
     }
@@ -27,7 +36,8 @@ enum ReaderTextStyler {
                 size: layout.fontSize,
                 weight: layout.bodyFontWeight
             ),
-            NSAttributedString.Key(kCTKernAttributeName as String): layout.characterSpacing
+            NSAttributedString.Key(kCTKernAttributeName as String): layout.characterSpacing,
+            NSAttributedString.Key(kCTLanguageAttributeName as String): "zh-Hans"
         ]
         if let foregroundColor {
             attributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = foregroundColor
@@ -37,10 +47,15 @@ enum ReaderTextStyler {
 
     private static func applyBodyParagraphStyle(
         to attributedString: NSMutableAttributedString,
-        layout: ReadingLayout
+        layout: ReadingLayout,
+        startsAtParagraphBoundary: Bool
     ) {
-        for paragraphRange in paragraphRanges(in: attributedString.string) {
-            let firstLineIndent = paragraphHasSourceIndent(in: attributedString.string, range: paragraphRange)
+        for (index, paragraphRange) in paragraphRanges(in: attributedString.string).enumerated() {
+            let isContinuation = index == 0 && !startsAtParagraphBoundary
+            let firstLineIndent = isContinuation || paragraphHasSourceIndent(
+                in: attributedString.string,
+                range: paragraphRange
+            )
                 ? 0
                 : layout.firstLineIndent * layout.fontSize
             attributedString.addAttributes(
@@ -50,7 +65,7 @@ enum ReaderTextStyler {
                         paragraphSpacing: layout.paragraphSpacing,
                         firstLineIndent: firstLineIndent,
                         alignment: .justified,
-                        lineBreakMode: .byCharWrapping
+                        lineBreakMode: .byWordWrapping
                     )
                 ],
                 range: NSRange(paragraphRange, in: attributedString.string)
@@ -80,9 +95,10 @@ enum ReaderTextStyler {
                 paragraphSpacing: layout.chapterTitleParagraphSpacing,
                 firstLineIndent: 0,
                 alignment: .left,
-                lineBreakMode: .byCharWrapping
+                lineBreakMode: .byWordWrapping
             ),
-            NSAttributedString.Key(kCTKernAttributeName as String): layout.chapterTitleCharacterSpacing
+            NSAttributedString.Key(kCTKernAttributeName as String): layout.chapterTitleCharacterSpacing,
+            NSAttributedString.Key(kCTLanguageAttributeName as String): "zh-Hans"
         ]
         if let foregroundColor {
             titleAttributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = foregroundColor

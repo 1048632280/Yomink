@@ -21,8 +21,9 @@ final class AutoReadSpeedPanelView: UIView {
     }
 
     func configure(speed: CGFloat, theme: ReadingTheme) {
-        speedSlider.value = Float(speed)
-        valueLabel.text = "\(Int(speed.rounded())) pt/s"
+        let clampedSpeed = min(CGFloat(speedSlider.maximumValue), max(CGFloat(speedSlider.minimumValue), speed))
+        speedSlider.value = Float(clampedSpeed)
+        valueLabel.text = "\(Int(clampedSpeed.rounded())) pt/s"
         applyTheme(theme)
     }
 
@@ -59,7 +60,7 @@ final class AutoReadSpeedPanelView: UIView {
         valueLabel.textAlignment = .right
 
         speedSlider.minimumValue = 12
-        speedSlider.maximumValue = 360
+        speedSlider.maximumValue = 240
         speedSlider.isContinuous = true
         speedSlider.addTarget(self, action: #selector(speedChanged), for: .valueChanged)
 

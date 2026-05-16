@@ -48,7 +48,11 @@ final class ReaderPageCell: UICollectionViewCell {
         let palette = ReadingThemePalette.palette(for: settings.theme)
         contentView.backgroundColor = palette.background
         let displayText = page.text.applyingContentFilters(filterRules)
-        pageView.configure(text: displayText, settings: settings)
+        pageView.configure(
+            text: displayText,
+            settings: settings,
+            startsAtParagraphBoundary: page.startsAtParagraphBoundary
+        )
         statusBarView.applyTheme(settings.theme)
         if let statusConfiguration {
             statusBarView.configure(statusConfiguration)
@@ -91,6 +95,7 @@ private extension String {
 private final class CoreTextPageView: UIView {
     private var text = ""
     private var settings = ReadingSettings.standard
+    private var startsAtParagraphBoundary = true
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -104,9 +109,10 @@ private final class CoreTextPageView: UIView {
         nil
     }
 
-    func configure(text: String, settings: ReadingSettings) {
+    func configure(text: String, settings: ReadingSettings, startsAtParagraphBoundary: Bool = true) {
         self.text = text
         self.settings = settings
+        self.startsAtParagraphBoundary = startsAtParagraphBoundary
         backgroundColor = ReadingThemePalette.palette(for: settings.theme).background
         setNeedsDisplay()
     }
@@ -127,7 +133,8 @@ private final class CoreTextPageView: UIView {
         let attributedString = ReaderTextStyler.attributedText(
             for: text,
             layout: layout,
-            foregroundColor: palette.primaryText.cgColor
+            foregroundColor: palette.primaryText.cgColor,
+            startsAtParagraphBoundary: startsAtParagraphBoundary
         )
         let framesetter = CTFramesetterCreateWithAttributedString(attributedString)
         let path = CGMutablePath()
