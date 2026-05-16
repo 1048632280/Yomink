@@ -225,9 +225,6 @@ final class ReaderViewController: UIViewController {
     }
 
     deinit {
-        autoReadDisplayLink?.invalidate()
-        autoReadDisplayLink = nil
-        lastAutoReadFrameTimestamp = nil
         Task { @MainActor in
             UIApplication.shared.isIdleTimerDisabled = false
             UIDevice.current.isBatteryMonitoringEnabled = false
