@@ -5,6 +5,11 @@ final class ReaderViewController: UIViewController {
         case main
     }
 
+    private enum TapPageDirection {
+        case previous
+        case next
+    }
+
     private var book: BookRecord
     private let openingService: ReaderOpeningService
     private let pagingService: ReaderPagingService
@@ -31,12 +36,12 @@ final class ReaderViewController: UIViewController {
     private var previousPageTask: Task<Void, Never>?
     private var nextPageTask: Task<Void, Never>?
     private var chapterRefreshTask: Task<Void, Never>?
+    private var chapterBoundaryRefreshTask: Task<Void, Never>?
     private var bookmarkStateTask: Task<Void, Never>?
     private var backgroundWorkResumeTask: Task<Void, Never>?
     private var bookmarkStateByteOffset: UInt64?
     private var isCurrentPageBookmarked = false
-    private var shouldScrollToPreviousPageAfterLoad = false
-    private var shouldScrollToNextPageAfterLoad = false
+    private var pendingTapPageTurnTargetPageIndex: Int?
     private var didStartOpening = false
     private var didReachEndOfBook = false
     private var isLoadingNextPage = false
@@ -187,6 +192,7 @@ final class ReaderViewController: UIViewController {
         previousPageTask?.cancel()
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
+        chapterBoundaryRefreshTask?.cancel()
         bookmarkStateTask?.cancel()
         backgroundWorkResumeTask?.cancel()
         chapterService.cancelParsing(bookID: book.id)
@@ -317,13 +323,20 @@ final class ReaderViewController: UIViewController {
     private func applyReadingSettings(_ settings: ReadingSettings) {
         updateCurrentPageFromVisiblePage()
         let preferredByteOffset = currentPage?.startByteOffset
-        activeSettings = settings.normalized(viewportSize: collectionView.bounds.size)
+        let previousSettings = activeSettings
+        let nextSettings = settings.normalized(viewportSize: collectionView.bounds.size)
+        let shouldRebuildPages = previousSettings.layout != nextSettings.layout
+        activeSettings = nextSettings
         readingSettingsStore.save(activeSettings)
-        pagingService.removeCachedPages()
         applyReaderPreferences()
         applyTheme(activeSettings.theme)
         refreshVisibleCellsForActiveSettings()
-        openPage(preferredByteOffset: preferredByteOffset)
+        if shouldRebuildPages {
+            pagingService.removeCachedPages()
+            openPage(preferredByteOffset: preferredByteOffset)
+        } else {
+            alignContentOffsetToCurrentPage()
+        }
     }
 
     private func applyReaderPreferences() {
@@ -425,7 +438,6 @@ final class ReaderViewController: UIViewController {
 
         let safeAreaInsets = view.safeAreaInsets
         let edgePadding: CGFloat = 12
-        let statusPadding: CGFloat = 34
         let safeTop = safeAreaInsets.top > 0 ? safeAreaInsets.top + edgePadding : 0
         let safeLeft = safeAreaInsets.left > 0 ? safeAreaInsets.left + edgePadding : 0
         let safeBottom = safeAreaInsets.bottom > 0 ? safeAreaInsets.bottom + edgePadding : 0
@@ -434,21 +446,6 @@ final class ReaderViewController: UIViewController {
         adjustedLayout.contentInsets.left = max(adjustedLayout.contentInsets.left, safeLeft)
         adjustedLayout.contentInsets.bottom = max(adjustedLayout.contentInsets.bottom, safeBottom)
         adjustedLayout.contentInsets.right = max(adjustedLayout.contentInsets.right, safeRight)
-
-        let reservedTop = max(statusPadding, safeAreaInsets.top + statusPadding)
-        let reservedBottom = max(statusPadding, safeAreaInsets.bottom + 24)
-        let reservesBottom = activeSettings.statusBarItems.contains(.batteryPercent)
-            || activeSettings.statusBarItems.contains(.battery)
-            || activeSettings.statusBarItems.contains(.time)
-            || activeSettings.statusBarItems.contains(.chapterPageProgress)
-            || activeSettings.statusBarItems.contains(.bookProgress)
-
-        if activeSettings.statusBarItems.contains(.chapterTitle) {
-            adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, reservedTop)
-        }
-        if reservesBottom {
-            adjustedLayout.contentInsets.bottom = max(adjustedLayout.contentInsets.bottom, reservedBottom)
-        }
         return adjustedLayout
     }
 
@@ -1047,8 +1044,36 @@ final class ReaderViewController: UIViewController {
         }
     }
 
+    private func scheduleChapterBoundaryRefresh(after delay: TimeInterval = 1.5, attempts: Int = 4) {
+        chapterBoundaryRefreshTask?.cancel()
+        chapterBoundaryRefreshTask = Task { @MainActor [weak self] in
+            for attempt in 0..<attempts {
+                let refreshDelay = attempt == 0 ? delay : 2.0
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(refreshDelay * 1_000_000_000))
+                } catch {
+                    return
+                }
+
+                guard let self else {
+                    return
+                }
+                guard !self.isAutoReading,
+                      !self.collectionView.isDragging,
+                      !self.collectionView.isDecelerating,
+                      !self.collectionView.isTracking else {
+                    continue
+                }
+                self.refreshChapters()
+            }
+        }
+    }
+
     private func reflowCurrentPageForChapterBoundaries() {
-        guard !isAutoReading else {
+        guard !isAutoReading,
+              !collectionView.isDragging,
+              !collectionView.isDecelerating,
+              !collectionView.isTracking else {
             return
         }
 
@@ -1288,6 +1313,8 @@ final class ReaderViewController: UIViewController {
     private func pauseBackgroundWork() {
         backgroundWorkResumeTask?.cancel()
         backgroundWorkResumeTask = nil
+        chapterBoundaryRefreshTask?.cancel()
+        chapterBoundaryRefreshTask = nil
         chapterService.pauseParsing(bookID: book.id)
         searchIndexService.pauseIndexing(bookID: book.id)
     }
@@ -1315,6 +1342,7 @@ final class ReaderViewController: UIViewController {
     private func resumeBackgroundWork() {
         chapterService.resumeParsing(bookID: book.id)
         searchIndexService.resumeIndexing(bookID: book.id, startingAt: currentPage?.startByteOffset ?? 0)
+        scheduleChapterBoundaryRefresh()
     }
 
     private func refreshVisibleCellsForActiveSettings() {
@@ -1412,10 +1440,11 @@ final class ReaderViewController: UIViewController {
         openingTask?.cancel()
         previousPageTask?.cancel()
         nextPageTask?.cancel()
+        chapterBoundaryRefreshTask?.cancel()
+        chapterBoundaryRefreshTask = nil
         previousPageTask = nil
         nextPageTask = nil
-        shouldScrollToPreviousPageAfterLoad = false
-        shouldScrollToNextPageAfterLoad = false
+        pendingTapPageTurnTargetPageIndex = nil
         isLoadingNextPage = false
         pages = []
         currentPage = nil
@@ -1445,7 +1474,9 @@ final class ReaderViewController: UIViewController {
                 }
                 openingTask = nil
                 applyInitialPage(result.page)
-                collectionView.setContentOffset(.zero, animated: false)
+                UIView.performWithoutAnimation {
+                    collectionView.setContentOffset(.zero, animated: false)
+                }
                 loadNextPageIfNeeded()
                 loadPreviousPageIfNeeded()
             } catch {
@@ -1467,6 +1498,7 @@ final class ReaderViewController: UIViewController {
         chapterService.scheduleParsing(bookID: book.id)
         searchIndexService.scheduleIndexing(bookID: book.id, startingAt: page.startByteOffset)
         refreshChapters()
+        scheduleChapterBoundaryRefresh()
     }
 
     @discardableResult
@@ -1508,7 +1540,9 @@ final class ReaderViewController: UIViewController {
                     y: collectionView.contentOffset.y
                 )
             }
-            collectionView.setContentOffset(adjustedOffset, animated: false)
+            UIView.performWithoutAnimation {
+                collectionView.setContentOffset(adjustedOffset, animated: false)
+            }
         }
         refreshVisibleCellsForActiveSettings()
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
@@ -1519,18 +1553,22 @@ final class ReaderViewController: UIViewController {
         var snapshot = NSDiffableDataSourceSnapshot<Section, ReaderPage>()
         snapshot.appendSections([.main])
         snapshot.appendItems(pages, toSection: .main)
-        dataSource?.apply(snapshot, animatingDifferences: false)
+        UIView.performWithoutAnimation {
+            dataSource?.apply(snapshot, animatingDifferences: false)
+        }
     }
 
     private func loadNextPageIfNeeded(scrollAfterLoading: Bool = false) {
-        if scrollAfterLoading {
-            shouldScrollToNextPageAfterLoad = true
-        }
         guard !didReachEndOfBook,
               let lastPage = pages.last,
               lastPage.endByteOffset < book.fileSize else {
-            shouldScrollToNextPageAfterLoad = false
+            if scrollAfterLoading {
+                pendingTapPageTurnTargetPageIndex = nil
+            }
             return
+        }
+        if scrollAfterLoading {
+            pendingTapPageTurnTargetPageIndex = lastPage.pageIndex + 1
         }
         guard nextPageTask == nil else {
             return
@@ -1559,12 +1597,16 @@ final class ReaderViewController: UIViewController {
                 nextPageTask = nil
                 guard let nextPage else {
                     didReachEndOfBook = true
-                    shouldScrollToNextPageAfterLoad = false
+                    if pendingTapPageTurnTargetPageIndex == request.pageIndex {
+                        pendingTapPageTurnTargetPageIndex = nil
+                    }
                     updateSessionState(isLoadingNextPage: false)
                     return
                 }
-                let shouldScroll = shouldScrollToNextPageAfterLoad
-                shouldScrollToNextPageAfterLoad = false
+                let shouldScroll = pendingTapPageTurnTargetPageIndex == nextPage.pageIndex
+                if shouldScroll {
+                    pendingTapPageTurnTargetPageIndex = nil
+                }
                 if let index = appendPage(nextPage),
                    shouldScroll {
                     scrollToPage(at: index, animated: false)
@@ -1574,20 +1616,24 @@ final class ReaderViewController: UIViewController {
                     return
                 }
                 nextPageTask = nil
-                shouldScrollToNextPageAfterLoad = false
+                if pendingTapPageTurnTargetPageIndex == request.pageIndex {
+                    pendingTapPageTurnTargetPageIndex = nil
+                }
                 updateSessionState(isLoadingNextPage: false)
             }
         }
     }
 
     private func loadPreviousPageIfNeeded(scrollAfterLoading: Bool = false) {
-        if scrollAfterLoading {
-            shouldScrollToPreviousPageAfterLoad = true
-        }
         guard let firstPage = pages.first,
               firstPage.startByteOffset > 0 else {
-            shouldScrollToPreviousPageAfterLoad = false
+            if scrollAfterLoading {
+                pendingTapPageTurnTargetPageIndex = nil
+            }
             return
+        }
+        if scrollAfterLoading {
+            pendingTapPageTurnTargetPageIndex = max(0, firstPage.pageIndex - 1)
         }
         guard previousPageTask == nil else {
             return
@@ -1614,11 +1660,15 @@ final class ReaderViewController: UIViewController {
                 }
                 previousPageTask = nil
                 guard let previousPage else {
-                    shouldScrollToPreviousPageAfterLoad = false
+                    if pendingTapPageTurnTargetPageIndex == request.pageIndex {
+                        pendingTapPageTurnTargetPageIndex = nil
+                    }
                     return
                 }
-                let shouldScroll = shouldScrollToPreviousPageAfterLoad
-                shouldScrollToPreviousPageAfterLoad = false
+                let shouldScroll = pendingTapPageTurnTargetPageIndex == previousPage.pageIndex
+                if shouldScroll {
+                    pendingTapPageTurnTargetPageIndex = nil
+                }
                 if let index = prependPage(previousPage),
                    shouldScroll {
                     scrollToPage(at: index, animated: false)
@@ -1628,7 +1678,9 @@ final class ReaderViewController: UIViewController {
                     return
                 }
                 previousPageTask = nil
-                shouldScrollToPreviousPageAfterLoad = false
+                if pendingTapPageTurnTargetPageIndex == request.pageIndex {
+                    pendingTapPageTurnTargetPageIndex = nil
+                }
             }
         }
     }
@@ -1767,7 +1819,9 @@ final class ReaderViewController: UIViewController {
                 y: collectionView.contentOffset.y
             )
         }
-        collectionView.setContentOffset(adjustedOffset, animated: false)
+        UIView.performWithoutAnimation {
+            collectionView.setContentOffset(adjustedOffset, animated: false)
+        }
     }
 
     private func updateSessionState(isLoadingNextPage: Bool) {
@@ -1834,25 +1888,14 @@ final class ReaderViewController: UIViewController {
     }
 
     private func pageForwardFromTap() {
-        guard snapToNearestPageIfNeeded(),
-              openingTask == nil else {
-            return
-        }
-        pauseBackgroundWork()
-        guard let currentPage,
-              let currentIndex = pages.firstIndex(of: currentPage) else {
-            return
-        }
-
-        let nextIndex = currentIndex + 1
-        if pages.indices.contains(nextIndex) {
-            scrollToPage(at: nextIndex, animated: false)
-        } else {
-            loadNextPageIfNeeded(scrollAfterLoading: true)
-        }
+        turnPageFromTap(.next)
     }
 
     private func pageBackwardFromTap() {
+        turnPageFromTap(.previous)
+    }
+
+    private func turnPageFromTap(_ direction: TapPageDirection) {
         guard snapToNearestPageIfNeeded(),
               openingTask == nil else {
             return
@@ -1863,11 +1906,25 @@ final class ReaderViewController: UIViewController {
             return
         }
 
-        let previousIndex = currentIndex - 1
-        if pages.indices.contains(previousIndex) {
-            scrollToPage(at: previousIndex, animated: false)
-        } else {
+        let targetIndex: Int
+        switch direction {
+        case .previous:
+            targetIndex = currentIndex - 1
+        case .next:
+            targetIndex = currentIndex + 1
+        }
+
+        if pages.indices.contains(targetIndex) {
+            pendingTapPageTurnTargetPageIndex = nil
+            scrollToPage(at: targetIndex, animated: false)
+            return
+        }
+
+        switch direction {
+        case .previous:
             loadPreviousPageIfNeeded(scrollAfterLoading: true)
+        case .next:
+            loadNextPageIfNeeded(scrollAfterLoading: true)
         }
     }
 
@@ -1882,7 +1939,11 @@ final class ReaderViewController: UIViewController {
             ? abs(collectionView.contentOffset.y - targetOffset.y)
             : abs(collectionView.contentOffset.x - targetOffset.x)
         if distance > 0.5 {
-            collectionView.setContentOffset(targetOffset, animated: false)
+            collectionView.layer.removeAllAnimations()
+            UIView.performWithoutAnimation {
+                collectionView.setContentOffset(targetOffset, animated: false)
+                collectionView.layoutIfNeeded()
+            }
         }
 
         currentPage = pages[visibleIndex]
@@ -1898,29 +1959,23 @@ final class ReaderViewController: UIViewController {
         return CGPoint(x: CGFloat(index) * collectionView.bounds.width, y: 0)
     }
 
-    private func scrollToPage(at index: Int, animated: Bool) {
+    private func scrollToPage(at index: Int, animated _: Bool) {
         guard pages.indices.contains(index) else {
             return
         }
 
         collectionView.layoutIfNeeded()
         let targetOffset = contentOffset(forPageAt: index)
-        let distance = usesVerticalScrolling
-            ? abs(collectionView.contentOffset.y - targetOffset.y)
-            : abs(collectionView.contentOffset.x - targetOffset.x)
-        guard distance > 0.5 else {
-            currentPage = pages[index]
-            updateSessionState(isLoadingNextPage: nextPageTask != nil)
-            finishPageTurn()
-            return
+        collectionView.layer.removeAllAnimations()
+        UIView.performWithoutAnimation {
+            collectionView.setContentOffset(targetOffset, animated: false)
+            collectionView.layoutIfNeeded()
         }
 
-        collectionView.setContentOffset(targetOffset, animated: animated)
         currentPage = pages[index]
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
-        if !animated {
-            finishPageTurn()
-        }
+        prefetchPagesNearCurrent()
+        scheduleBackgroundWorkResume(after: 1.5)
     }
 
     private func finishPageTurn() {
@@ -1929,9 +1984,22 @@ final class ReaderViewController: UIViewController {
         } else {
             snapToNearestPageIfNeeded()
         }
-        loadPreviousPageIfNeeded()
-        loadNextPageIfNeeded()
+        prefetchPagesNearCurrent()
         scheduleBackgroundWorkResume(after: 1.5)
+    }
+
+    private func prefetchPagesNearCurrent() {
+        guard let currentPage,
+              let currentIndex = pages.firstIndex(of: currentPage) else {
+            return
+        }
+
+        if currentIndex <= 1 {
+            loadPreviousPageIfNeeded()
+        }
+        if currentIndex >= pages.count - 2 {
+            loadNextPageIfNeeded()
+        }
     }
 
     private func showTransientNotice(title: String) {
@@ -1984,8 +2052,7 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        shouldScrollToPreviousPageAfterLoad = false
-        shouldScrollToNextPageAfterLoad = false
+        pendingTapPageTurnTargetPageIndex = nil
         pauseBackgroundWork()
         if isAutoReading {
             stopAutoReading()

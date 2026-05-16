@@ -39,12 +39,11 @@ enum ReaderTextStyler {
         layout: ReadingLayout,
         foregroundColor: CGColor?
     ) {
-        guard let lineRange = firstLineRange(in: attributedString.string),
-              normalizedChapterTitle(from: String(attributedString.string[lineRange])) != nil else {
+        let chapterTitleRanges = chapterTitleRanges(in: attributedString.string)
+        guard !chapterTitleRanges.isEmpty else {
             return
         }
 
-        let nsRange = NSRange(lineRange, in: attributedString.string)
         let titleFontSize = layout.fontSize + 1
         let titleFont = CTFontCreateWithName(layout.fontName as CFString, titleFontSize, nil)
         let boldTitleFont = CTFontCreateCopyWithSymbolicTraits(
@@ -64,7 +63,12 @@ enum ReaderTextStyler {
         if let foregroundColor {
             titleAttributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = foregroundColor
         }
-        attributedString.addAttributes(titleAttributes, range: nsRange)
+        for lineRange in chapterTitleRanges {
+            attributedString.addAttributes(
+                titleAttributes,
+                range: NSRange(lineRange, in: attributedString.string)
+            )
+        }
     }
 
     private static func firstLineRange(in text: String) -> Range<String.Index>? {
@@ -73,6 +77,25 @@ enum ReaderTextStyler {
         }
         let endIndex = text.firstIndex(where: \.isNewline) ?? text.endIndex
         return text.startIndex..<endIndex
+    }
+
+    private static func chapterTitleRanges(in text: String) -> [Range<String.Index>] {
+        guard !text.isEmpty else {
+            return []
+        }
+
+        var ranges: [Range<String.Index>] = []
+        text.enumerateSubstrings(
+            in: text.startIndex..<text.endIndex,
+            options: .byLines
+        ) { substring, lineRange, _, _ in
+            guard let substring,
+                  normalizedChapterTitle(from: substring) != nil else {
+                return
+            }
+            ranges.append(lineRange)
+        }
+        return ranges
     }
 
     private static func paragraphStyle(

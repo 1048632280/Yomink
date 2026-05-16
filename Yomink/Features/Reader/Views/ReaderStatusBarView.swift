@@ -100,7 +100,7 @@ final class ReaderStatusBarView: UIView {
         bottomLeftStackView.translatesAutoresizingMaskIntoConstraints = false
         bottomLeftStackView.axis = .horizontal
         bottomLeftStackView.alignment = .center
-        bottomLeftStackView.spacing = 8
+        bottomLeftStackView.spacing = 5
         bottomLeftStackView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         bottomRightStackView.translatesAutoresizingMaskIntoConstraints = false
@@ -119,12 +119,12 @@ final class ReaderStatusBarView: UIView {
             topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
 
             bottomLeftStackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
-            bottomLeftStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -2),
+            bottomLeftStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
             bottomLeftStackView.trailingAnchor.constraint(lessThanOrEqualTo: bottomRightStackView.leadingAnchor, constant: -12),
             bottomLeftStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48),
 
             bottomRightStackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            bottomRightStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor, constant: -2),
+            bottomRightStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
             bottomRightStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48)
         ])
 
