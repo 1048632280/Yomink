@@ -108,4 +108,43 @@ final class ChapterRepositoryTests: XCTestCase {
         XCTAssertEqual(snapshot.status, .completed)
         XCTAssertTrue(try repository.isParsingCompleted(bookID: bookID))
     }
+
+    func testChapterRepositoryNormalizesNextSortIndexAfterIgnoredDuplicate() throws {
+        let databaseManager = try DatabaseManager.inMemory()
+        let repository = ChapterRepository(databaseManager: databaseManager)
+        let bookID = UUID()
+        let chapter = ReadingChapter(
+            bookID: bookID,
+            title: "第一章",
+            byteOffset: 128,
+            sortIndex: 0
+        )
+
+        try repository.insertChapters([chapter])
+        let nextSortIndex = try repository.insertChapters(
+            [
+                ReadingChapter(
+                    bookID: bookID,
+                    title: "第一章",
+                    byteOffset: 128,
+                    sortIndex: 10
+                )
+            ],
+            state: ChapterParseState(
+                bookID: bookID,
+                scannedUntilByteOffset: 512,
+                fileSize: 1_024,
+                nextSortIndex: 11,
+                updatedAt: Date(timeIntervalSince1970: 4),
+                completedAt: nil,
+                failureReason: nil
+            )
+        )
+
+        let snapshot = try repository.fetchCatalogSnapshot(bookID: bookID)
+
+        XCTAssertEqual(snapshot.chapters.count, 1)
+        XCTAssertEqual(nextSortIndex, 1)
+        XCTAssertEqual(snapshot.state?.nextSortIndex, 1)
+    }
 }

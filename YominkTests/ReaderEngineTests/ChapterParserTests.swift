@@ -164,6 +164,29 @@ final class ReadingChapterServiceTests: XCTestCase {
         XCTAssertEqual(snapshot.status, .completed)
     }
 
+    func testChapterServiceCompletesEmptyBook() async throws {
+        let databaseManager = try DatabaseManager.inMemory()
+        let bookRepository = BookRepository(databaseManager: databaseManager)
+        let chapterRepository = ChapterRepository(databaseManager: databaseManager)
+        let service = ReadingChapterService(
+            bookRepository: bookRepository,
+            chapterRepository: chapterRepository,
+            parser: ChapterParser()
+        )
+        let book = try makeImportedBook(repository: bookRepository, text: "")
+        defer {
+            try? FileManager.default.removeItem(at: book.fileURL)
+        }
+
+        service.scheduleParsing(bookID: book.id)
+        let snapshot = try await waitForSnapshot(service: service, bookID: book.id) {
+            $0.status == .completed
+        }
+
+        XCTAssertTrue(snapshot.chapters.isEmpty)
+        XCTAssertEqual(snapshot.status, .completed)
+    }
+
     private func makeImportedBook(repository: BookRepository, text: String) throws -> BookRecord {
         let fileURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)

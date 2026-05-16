@@ -98,9 +98,25 @@ final class ReadingChapterService: @unchecked Sendable {
                 return
             }
 
+            var snapshot = try chapterRepository.fetchCatalogSnapshot(bookID: bookID)
+            if book.fileSize == 0 {
+                if snapshot.state?.isCompleted == true {
+                    return
+                }
+                try chapterRepository.updateParsingState(
+                    bookID: bookID,
+                    scannedUntilByteOffset: 0,
+                    fileSize: 0,
+                    nextSortIndex: try chapterRepository.nextSortIndex(bookID: bookID),
+                    completedAt: Date(),
+                    failureReason: nil
+                )
+                chapterUpdates.send(bookID)
+                return
+            }
+
             let mapping = try BookFileMapping(fileURL: book.fileURL)
             fileSize = mapping.fileSize
-            var snapshot = try chapterRepository.fetchCatalogSnapshot(bookID: bookID)
 
             if let state = snapshot.state,
                state.fileSize > 0,
@@ -120,15 +136,25 @@ final class ReadingChapterService: @unchecked Sendable {
             var recentCandidates = snapshot.chapters.suffix(12).map {
                 ChapterCandidate(title: $0.title, byteOffset: $0.byteOffset)
             }
+            let isRetryingFailure: Bool = {
+                if case .failed(_) = snapshot.status {
+                    return true
+                }
+                return false
+            }()
 
-            if snapshot.state == nil {
+            if snapshot.state == nil || isRetryingFailure {
                 try chapterRepository.updateParsingState(
                     bookID: bookID,
                     scannedUntilByteOffset: latestScannedByteOffset,
                     fileSize: fileSize,
                     nextSortIndex: nextSortIndex,
-                    completedAt: nil
+                    completedAt: nil,
+                    failureReason: nil
                 )
+                if isRetryingFailure {
+                    chapterUpdates.send(bookID)
+                }
             }
 
             var windowStartByteOffset = latestScannedByteOffset > ChapterParser.overlapLength
@@ -181,7 +207,7 @@ final class ReadingChapterService: @unchecked Sendable {
                     completedAt: didComplete ? Date() : nil,
                     failureReason: nil
                 )
-                try chapterRepository.insertChapters(pendingChapters, state: state)
+                nextSortIndex = try chapterRepository.insertChapters(pendingChapters, state: state)
 
                 if !pendingChapters.isEmpty || didComplete {
                     chapterUpdates.send(bookID)
@@ -219,9 +245,9 @@ final class ReadingChapterService: @unchecked Sendable {
 
     private static func shouldScheduleParsing(for status: ChapterParseStatus) -> Bool {
         switch status {
-        case .notStarted, .parsing:
+        case .notStarted, .parsing, .failed:
             return true
-        case .completed, .failed:
+        case .completed:
             return false
         }
     }

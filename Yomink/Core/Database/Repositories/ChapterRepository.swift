@@ -72,12 +72,13 @@ final class ChapterRepository: @unchecked Sendable {
         }
     }
 
-    func insertChapters(_ chapters: [ReadingChapter], state: ChapterParseState) throws {
+    @discardableResult
+    func insertChapters(_ chapters: [ReadingChapter], state: ChapterParseState) throws -> Int {
         guard let writer = databaseManager.writer else {
             throw BookRepositoryError.databaseUnavailable
         }
 
-        try writer.write { database in
+        return try writer.write { database in
             for chapter in chapters {
                 try database.execute(
                     sql: """
@@ -87,7 +88,10 @@ final class ChapterRepository: @unchecked Sendable {
                     arguments: chapter.databaseArguments
                 )
             }
-            try Self.upsertParsingState(state, database: database)
+            let actualNextSortIndex = try Self.nextSortIndex(bookID: state.bookID, database: database)
+            let normalizedState = state.withNextSortIndex(actualNextSortIndex)
+            try Self.upsertParsingState(normalizedState, database: database)
+            return actualNextSortIndex
         }
     }
 
@@ -316,6 +320,18 @@ private extension ChapterParseState {
             nextSortIndex: row["nextSortIndex"],
             updatedAt: Date(timeIntervalSince1970: updatedAt),
             completedAt: completedAtValue > 0 ? Date(timeIntervalSince1970: completedAtValue) : nil,
+            failureReason: failureReason
+        )
+    }
+
+    func withNextSortIndex(_ nextSortIndex: Int) -> ChapterParseState {
+        ChapterParseState(
+            bookID: bookID,
+            scannedUntilByteOffset: scannedUntilByteOffset,
+            fileSize: fileSize,
+            nextSortIndex: nextSortIndex,
+            updatedAt: updatedAt,
+            completedAt: completedAt,
             failureReason: failureReason
         )
     }

@@ -24,6 +24,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
     var onChapterSelected: ((ReadingChapter) -> Void)?
     var onBookmarkSelected: ((ReadingBookmark) -> Void)?
     var onBookmarkDeleteRequested: ((ReadingBookmark, @escaping (Bool) -> Void) -> Void)?
+    var onClose: (() -> Void)?
 
     private var chapters: [ReadingChapter]
     private var bookmarks: [ReadingBookmark]
@@ -39,6 +40,11 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private var chapterSearchText = ""
     private var didScrollToCurrentChapter = false
     private var shouldHideCollectionUntilInitialScroll = false
+    private var didApplyInitialSnapshot = false
+    private var isApplyingSnapshot = false
+    private var pendingSnapshotUpdate: Bool?
+    private var pendingScrollToTopAfterSnapshot = false
+    private var isClosing = false
     private let searchBar = UISearchBar(frame: .zero)
     private var searchBarHeightConstraint: NSLayoutConstraint?
     private lazy var edgeJumpButton = UIBarButtonItem(
@@ -91,14 +97,31 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     func updateCatalogSnapshot(_ snapshot: ChapterCatalogSnapshot) {
+        guard !isClosing else {
+            return
+        }
         chapters = snapshot.chapters
         chapterStatus = snapshot.status
+        guard isViewLoaded else {
+            return
+        }
         applySnapshot(animatingDifferences: true)
+    }
+
+    var canAcceptCatalogUpdates: Bool {
+        isViewLoaded && !isClosing
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         scrollToCurrentChapterIfNeeded()
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        if isMovingFromParent || isBeingDismissed || navigationController?.isBeingDismissed == true {
+            beginClosing()
+        }
     }
 
     private func configureNavigationItems() {
@@ -189,11 +212,42 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private func applySnapshot(animatingDifferences: Bool) {
+        guard !isClosing,
+              isViewLoaded,
+              let dataSource else {
+            return
+        }
+        guard !isApplyingSnapshot else {
+            pendingSnapshotUpdate = (pendingSnapshotUpdate ?? false) || animatingDifferences
+            return
+        }
+
+        isApplyingSnapshot = true
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
         snapshot.appendSections([.main])
         snapshot.appendItems(itemsForSelectedSegment(), toSection: .main)
-        dataSource?.apply(snapshot, animatingDifferences: animatingDifferences) { [weak self] in
-            self?.scrollToCurrentChapterIfNeeded()
+        dataSource.apply(snapshot, animatingDifferences: animatingDifferences) { [weak self] in
+            guard let self else {
+                return
+            }
+            self.isApplyingSnapshot = false
+            guard !self.isClosing else {
+                self.pendingSnapshotUpdate = nil
+                self.pendingScrollToTopAfterSnapshot = false
+                return
+            }
+            self.didApplyInitialSnapshot = true
+            if let pendingSnapshotUpdate = self.pendingSnapshotUpdate {
+                self.pendingSnapshotUpdate = nil
+                self.applySnapshot(animatingDifferences: pendingSnapshotUpdate)
+                return
+            }
+            if self.pendingScrollToTopAfterSnapshot {
+                self.pendingScrollToTopAfterSnapshot = false
+                self.scrollToTop(animated: false)
+            } else {
+                self.scrollToCurrentChapterIfNeeded()
+            }
         }
     }
 
@@ -243,9 +297,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
     @objc private func segmentChanged() {
         selectedSegment = Segment(rawValue: segmentedControl.selectedSegmentIndex) ?? .chapters
+        didScrollToCurrentChapter = selectedSegment != .chapters
+        pendingScrollToTopAfterSnapshot = selectedSegment == .bookmarks
         updateSearchBarVisibility(animated: true)
         applySnapshot()
-        scrollToTop(animated: false)
         setEdgeJumpTarget(.bottom)
     }
 
@@ -285,8 +340,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
     private func scrollToCurrentChapterIfNeeded() {
         guard !didScrollToCurrentChapter,
+              didApplyInitialSnapshot,
               selectedSegment == .chapters,
               chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !chapters.isEmpty,
               let currentIndex = currentChapterIndex(),
               collectionView.numberOfItems(inSection: 0) > currentIndex else {
             return
@@ -323,8 +380,17 @@ final class CatalogAndBookmarksViewController: UIViewController {
         }
     }
 
+    private var canScrollEdgeJump: Bool {
+        switch selectedSegment {
+        case .chapters:
+            return !filteredChapters().isEmpty
+        case .bookmarks:
+            return !bookmarks.isEmpty
+        }
+    }
+
     private func scrollToTop(animated: Bool) {
-        guard collectionView.numberOfItems(inSection: 0) > 0 else {
+        guard canScrollEdgeJump else {
             return
         }
         collectionView.scrollToItem(
@@ -337,7 +403,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
     private func scrollToBottom(animated: Bool) {
         let itemCount = collectionView.numberOfItems(inSection: 0)
-        guard itemCount > 0 else {
+        guard canScrollEdgeJump else {
             return
         }
         collectionView.scrollToItem(
@@ -349,6 +415,9 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     @objc private func edgeJumpTapped() {
+        guard canScrollEdgeJump else {
+            return
+        }
         switch edgeJumpTarget {
         case .bottom:
             scrollToBottom(animated: true)
@@ -390,6 +459,9 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private func closePage(completion: (() -> Void)? = nil) {
+        guard beginClosing() else {
+            return
+        }
         if let navigationController,
            navigationController.viewControllers.first !== self {
             navigationController.popViewController(animated: true)
@@ -406,6 +478,20 @@ final class CatalogAndBookmarksViewController: UIViewController {
         } else {
             dismiss(animated: true, completion: completion)
         }
+    }
+
+    @discardableResult
+    private func beginClosing() -> Bool {
+        guard !isClosing else {
+            return false
+        }
+        isClosing = true
+        pendingSnapshotUpdate = nil
+        pendingScrollToTopAfterSnapshot = false
+        collectionView.isUserInteractionEnabled = false
+        searchBar.resignFirstResponder()
+        onClose?()
+        return true
     }
 
     private func swipeActionsConfiguration(for indexPath: IndexPath) -> UISwipeActionsConfiguration? {
@@ -456,20 +542,28 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
 extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard !isClosing else {
+            return
+        }
         collectionView.deselectItem(at: indexPath, animated: true)
         guard let item = dataSource?.itemIdentifier(for: indexPath) else {
             return
         }
 
-        closePage { [onChapterSelected, onBookmarkSelected] in
-            switch item {
-            case .chapter(let chapter, _):
-                onChapterSelected?(chapter)
-            case .bookmark(let bookmark):
-                onBookmarkSelected?(bookmark)
-            case .empty:
-                break
+        switch item {
+        case .chapter(_, _), .bookmark(_):
+            closePage { [onChapterSelected, onBookmarkSelected] in
+                switch item {
+                case .chapter(let chapter, _):
+                    onChapterSelected?(chapter)
+                case .bookmark(let bookmark):
+                    onBookmarkSelected?(bookmark)
+                case .empty:
+                    break
+                }
             }
+        case .empty:
+            return
         }
     }
 
@@ -492,11 +586,12 @@ extension CatalogAndBookmarksViewController: UISearchBarDelegate {
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         chapterSearchText = searchText
+        didScrollToCurrentChapter = true
+        pendingScrollToTopAfterSnapshot = true
         guard selectedSegment == .chapters else {
             return
         }
         applySnapshot(animatingDifferences: true)
-        scrollToTop(animated: false)
     }
 
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
@@ -506,13 +601,14 @@ extension CatalogAndBookmarksViewController: UISearchBarDelegate {
     func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         chapterSearchText = ""
         searchBar.text = nil
+        didScrollToCurrentChapter = false
+        pendingScrollToTopAfterSnapshot = false
         searchBar.setShowsCancelButton(false, animated: true)
         searchBar.resignFirstResponder()
         guard selectedSegment == .chapters else {
             return
         }
         applySnapshot(animatingDifferences: true)
-        scrollToTop(animated: false)
     }
 }
 

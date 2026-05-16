@@ -55,6 +55,7 @@ final class ReaderViewController: UIViewController {
     private var preferredInterfaceStyle: UIUserInterfaceStyle = .unspecified
     private var pagingGeneration = 0
     private weak var catalogViewController: CatalogAndBookmarksViewController?
+    private var isLoadingCatalog = false
     private var keepsChapterParsingActiveWhileCovered = false
     private weak var previousInteractivePopGestureDelegate: UIGestureRecognizerDelegate?
     private var previousInteractivePopGestureWasEnabled = true
@@ -569,6 +570,13 @@ final class ReaderViewController: UIViewController {
     }
 
     @objc private func showCatalogAndBookmarks() {
+        guard catalogViewController == nil,
+              !isLoadingCatalog else {
+            return
+        }
+        isLoadingCatalog = true
+        keepsChapterParsingActiveWhileCovered = true
+        chapterService.resumeParsing(bookID: book.id)
         setChromeVisible(false, animated: true)
         Task { [weak self] in
             guard let self else {
@@ -579,8 +587,11 @@ final class ReaderViewController: UIViewController {
                 let snapshot = try await chapterService.catalogSnapshot(bookID: book.id)
                 self.chapters = snapshot.chapters
                 let bookmarks = try await bookmarkService.bookmarks(bookID: book.id)
+                isLoadingCatalog = false
                 presentCatalogAndBookmarks(snapshot: snapshot, bookmarks: bookmarks)
             } catch {
+                isLoadingCatalog = false
+                keepsChapterParsingActiveWhileCovered = false
                 showTransientNotice(title: "\u{76EE}\u{5F55}\u{52A0}\u{8F7D}\u{5931}\u{8D25}")
             }
         }
@@ -594,6 +605,14 @@ final class ReaderViewController: UIViewController {
         )
         catalogViewController = listViewController
         keepsChapterParsingActiveWhileCovered = true
+        listViewController.onClose = { [weak self, weak listViewController] in
+            guard let self,
+                  self.catalogViewController === listViewController else {
+                return
+            }
+            self.catalogViewController = nil
+            self.keepsChapterParsingActiveWhileCovered = false
+        }
         listViewController.onChapterSelected = { [weak self] chapter in
             self?.jumpToChapter(chapter)
         }
@@ -619,7 +638,15 @@ final class ReaderViewController: UIViewController {
     }
 
     private func jumpToChapter(_ chapter: ReadingChapter) {
-        jumpToByteOffset(min(chapter.byteOffset, book.fileSize.saturatingLastByteOffset))
+        guard chapter.bookID == book.id,
+              book.fileSize > 0,
+              chapter.byteOffset < book.fileSize else {
+            showTransientNotice(title: "\u{76EE}\u{5F55}\u{8DF3}\u{8F6C}\u{5931}\u{8D25}")
+            return
+        }
+        chapterRefreshTask?.cancel()
+        chapterRefreshTask = nil
+        jumpToByteOffset(chapter.byteOffset)
     }
 
     private func jumpToBookmark(_ bookmark: ReadingBookmark) {
@@ -1065,7 +1092,7 @@ final class ReaderViewController: UIViewController {
         }
 
         if chapters.isEmpty {
-            refreshChapters()
+            refreshChapterCatalog(scheduleIfNeeded: true)
             showTransientNotice(title: "\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{4E2D}")
             return
         }
@@ -1116,10 +1143,6 @@ final class ReaderViewController: UIViewController {
         )
     }
 
-    private func refreshChapters() {
-        refreshChapterCatalog(scheduleIfNeeded: false)
-    }
-
     private func subscribeToChapterUpdates() {
         let currentBookID = book.id
         chapterUpdatesCancellable = chapterService.chapterUpdates
@@ -1153,12 +1176,12 @@ final class ReaderViewController: UIViewController {
                 }
                 let loadedChapters = snapshot.chapters
                 didChangeChapters = loadedChapters != chapters
-                let currentPageCrossesNewBoundary = currentPage.map {
-                    pageCrossesChapterBoundary($0, in: loadedChapters)
-                } ?? false
-                shouldReflowForChapterBoundaries = currentPageCrossesNewBoundary
+                shouldReflowForChapterBoundaries = didChangeChapters
+                    && (currentPage.map { pageCrossesChapterBoundary($0, in: loadedChapters) } ?? false)
                 chapters = loadedChapters
-                catalogViewController?.updateCatalogSnapshot(snapshot)
+                if catalogViewController?.canAcceptCatalogUpdates == true {
+                    catalogViewController?.updateCatalogSnapshot(snapshot)
+                }
             } catch {
                 chapterRefreshTask = nil
                 return
@@ -1190,22 +1213,6 @@ final class ReaderViewController: UIViewController {
         let preferredByteOffset = currentPage.startByteOffset
         pagingService.removeCachedPages()
         openPage(preferredByteOffset: preferredByteOffset)
-    }
-
-    private func hasResolvedChapterBoundaryForCurrentPage() -> Bool {
-        guard let currentPage else {
-            return true
-        }
-
-        guard currentPage.endByteOffset < book.fileSize else {
-            return true
-        }
-
-        guard !pageCrossesChapterBoundary(currentPage) else {
-            return false
-        }
-
-        return chapters.contains { $0.byteOffset > currentPage.endByteOffset }
     }
 
     private func showMoreMenu() {
@@ -1652,7 +1659,9 @@ final class ReaderViewController: UIViewController {
                 }
                 let loadedChapters = snapshot.chapters
                 chapters = loadedChapters
-                catalogViewController?.updateCatalogSnapshot(snapshot)
+                if catalogViewController?.canAcceptCatalogUpdates == true {
+                    catalogViewController?.updateCatalogSnapshot(snapshot)
+                }
                 updateChrome()
                 refreshVisibleStatusWidgets()
             } catch {
