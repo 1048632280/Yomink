@@ -16,7 +16,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private enum Item: Hashable {
-        case chapter(ReadingChapter)
+        case chapter(ReadingChapter, displayIndex: Int)
         case bookmark(ReadingBookmark)
         case empty(String)
     }
@@ -27,6 +27,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
 
     private let chapters: [ReadingChapter]
     private var bookmarks: [ReadingBookmark]
+    private let currentByteOffset: UInt64?
     private let segmentedControl = UISegmentedControl(
         items: ["\u{76EE}\u{5F55}", "\u{4E66}\u{7B7E}"]
     )
@@ -34,6 +35,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private var dataSource: UICollectionViewDiffableDataSource<Section, Item>?
     private var edgeJumpTarget: EdgeJumpTarget = .bottom
     private var lastContentOffsetY: CGFloat = 0
+    private var chapterSearchText = ""
+    private var didScrollToCurrentChapter = false
+    private let searchBar = UISearchBar(frame: .zero)
+    private var searchBarHeightConstraint: NSLayoutConstraint?
     private lazy var edgeJumpButton = UIBarButtonItem(
         title: "\u{5E95}\u{90E8}",
         style: .plain,
@@ -57,9 +62,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
         return collectionView
     }()
 
-    init(chapters: [ReadingChapter], bookmarks: [ReadingBookmark]) {
+    init(chapters: [ReadingChapter], bookmarks: [ReadingBookmark], currentByteOffset: UInt64?) {
         self.chapters = chapters
         self.bookmarks = bookmarks
+        self.currentByteOffset = currentByteOffset
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -72,9 +78,16 @@ final class CatalogAndBookmarksViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = YominkTheme.background
         configureNavigationItems()
+        configureSearchBar()
         configureCollectionView()
         configureDataSource()
+        updateSearchBarVisibility(animated: false)
         applySnapshot()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        scrollToCurrentChapterIfNeeded()
     }
 
     private func configureNavigationItems() {
@@ -92,38 +105,60 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private func configureCollectionView() {
+        searchBar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(searchBar)
         view.addSubview(collectionView)
         collectionView.delegate = self
+        let searchBarHeightConstraint = searchBar.heightAnchor.constraint(equalToConstant: 52)
+        self.searchBarHeightConstraint = searchBarHeightConstraint
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            searchBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            searchBarHeightConstraint,
+
+            collectionView.topAnchor.constraint(equalTo: searchBar.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
     }
 
+    private func configureSearchBar() {
+        searchBar.delegate = self
+        searchBar.placeholder = "\u{641C}\u{7D22}"
+        searchBar.searchBarStyle = .minimal
+        searchBar.autocapitalizationType = .none
+        searchBar.autocorrectionType = .no
+        searchBar.showsCancelButton = false
+    }
+
     private func configureDataSource() {
+        let currentChapterID = currentChapterIndex().map { chapters[$0].id }
         let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Item> { cell, _, item in
             var content = UIListContentConfiguration.subtitleCell()
             cell.accessories = []
 
             switch item {
-            case .chapter(let chapter):
-                content.text = chapter.title
-                content.secondaryText = "\u{4F4D}\u{7F6E} \(chapter.byteOffset)"
+            case .chapter(let chapter, let displayIndex):
+                content.text = "\(displayIndex).\(chapter.title)"
+                content.secondaryText = nil
+                let isCurrentChapter = currentChapterID.map { $0 == chapter.id } ?? false
+                content.textProperties.color = isCurrentChapter ? .systemRed : YominkTheme.primaryText
                 cell.accessories = [.disclosureIndicator()]
             case .bookmark(let bookmark):
                 content.text = bookmark.title
                 content.secondaryText = "\u{4F4D}\u{7F6E} \(bookmark.byteOffset)"
                 content.image = UIImage(systemName: "bookmark.fill")
                 content.imageProperties.tintColor = YominkTheme.primaryText
+                content.textProperties.color = YominkTheme.primaryText
                 cell.accessories = [.disclosureIndicator()]
             case .empty(let message):
                 content.text = message
                 content.secondaryText = nil
+                content.textProperties.color = YominkTheme.primaryText
             }
 
-            content.textProperties.color = YominkTheme.primaryText
             content.secondaryTextProperties.color = YominkTheme.secondaryText
             cell.contentConfiguration = content
             cell.backgroundConfiguration = UIBackgroundConfiguration.clear()
@@ -150,9 +185,12 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private func itemsForSelectedSegment() -> [Item] {
         switch selectedSegment {
         case .chapters:
-            return chapters.isEmpty
-                ? [.empty("\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{4E2D}")]
-                : chapters.map(Item.chapter)
+            let filteredChapters = filteredChapters()
+            return filteredChapters.isEmpty
+                ? [.empty(chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{4E2D}" : "\u{672A}\u{627E}\u{5230}\u{5339}\u{914D}\u{76EE}\u{5F55}")]
+                : filteredChapters.map { item in
+                    Item.chapter(item.chapter, displayIndex: item.displayIndex)
+                }
         case .bookmarks:
             return bookmarks.isEmpty
                 ? [.empty("\u{6682}\u{65E0}\u{4E66}\u{7B7E}")]
@@ -160,11 +198,73 @@ final class CatalogAndBookmarksViewController: UIViewController {
         }
     }
 
+    private func filteredChapters() -> [(chapter: ReadingChapter, displayIndex: Int)] {
+        let indexedChapters = chapters.enumerated().map { index, chapter in
+            (chapter: chapter, displayIndex: index + 1)
+        }
+        let query = chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            return indexedChapters
+        }
+        return indexedChapters.filter { item in
+            item.chapter.title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
+    }
+
     @objc private func segmentChanged() {
         selectedSegment = Segment(rawValue: segmentedControl.selectedSegmentIndex) ?? .chapters
+        updateSearchBarVisibility(animated: true)
         applySnapshot()
         scrollToTop(animated: false)
         setEdgeJumpTarget(.bottom)
+    }
+
+    private func updateSearchBarVisibility(animated: Bool) {
+        let shouldShowSearchBar = selectedSegment == .chapters
+        if shouldShowSearchBar {
+            searchBar.isHidden = false
+        } else {
+            chapterSearchText = ""
+            searchBar.text = nil
+            searchBar.showsCancelButton = false
+            searchBar.resignFirstResponder()
+        }
+        searchBarHeightConstraint?.constant = shouldShowSearchBar ? 52 : 0
+        let layoutUpdate = {
+            self.view.layoutIfNeeded()
+            self.searchBar.isHidden = !shouldShowSearchBar
+        }
+        if animated {
+            UIView.animate(withDuration: 0.2, animations: layoutUpdate)
+        } else {
+            layoutUpdate()
+        }
+    }
+
+    private func currentChapterIndex() -> Int? {
+        guard let currentByteOffset,
+              !chapters.isEmpty else {
+            return nil
+        }
+        return chapters.lastIndex { $0.byteOffset <= currentByteOffset }
+    }
+
+    private func scrollToCurrentChapterIfNeeded() {
+        guard !didScrollToCurrentChapter,
+              selectedSegment == .chapters,
+              chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let currentIndex = currentChapterIndex(),
+              collectionView.numberOfItems(inSection: 0) > currentIndex else {
+            return
+        }
+        didScrollToCurrentChapter = true
+        collectionView.scrollToItem(
+            at: IndexPath(item: currentIndex, section: 0),
+            at: .centeredVertically,
+            animated: false
+        )
+        lastContentOffsetY = collectionView.contentOffset.y
+        updateEdgeJumpTargetForScroll()
     }
 
     private func scrollToTop(animated: Bool) {
@@ -298,7 +398,7 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
 
         closePage { [onChapterSelected, onBookmarkSelected] in
             switch item {
-            case .chapter(let chapter):
+            case .chapter(let chapter, _):
                 onChapterSelected?(chapter)
             case .bookmark(let bookmark):
                 onBookmarkSelected?(bookmark)
@@ -314,5 +414,36 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
 
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         updateEdgeJumpTargetForScroll()
+    }
+}
+
+extension CatalogAndBookmarksViewController: UISearchBarDelegate {
+    func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
+        searchBar.setShowsCancelButton(true, animated: true)
+    }
+
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        chapterSearchText = searchText
+        guard selectedSegment == .chapters else {
+            return
+        }
+        applySnapshot(animatingDifferences: true)
+        scrollToTop(animated: false)
+    }
+
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
+    }
+
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        chapterSearchText = ""
+        searchBar.text = nil
+        searchBar.setShowsCancelButton(false, animated: true)
+        searchBar.resignFirstResponder()
+        guard selectedSegment == .chapters else {
+            return
+        }
+        applySnapshot(animatingDifferences: true)
+        scrollToTop(animated: false)
     }
 }

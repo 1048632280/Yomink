@@ -514,7 +514,8 @@ final class ReaderViewController: UIViewController {
     private func presentCatalogAndBookmarks(chapters: [ReadingChapter], bookmarks: [ReadingBookmark]) {
         let listViewController = CatalogAndBookmarksViewController(
             chapters: chapters,
-            bookmarks: bookmarks
+            bookmarks: bookmarks,
+            currentByteOffset: currentPage?.startByteOffset
         )
         listViewController.onChapterSelected = { [weak self] chapter in
             self?.jumpToChapter(chapter)
@@ -581,7 +582,7 @@ final class ReaderViewController: UIViewController {
         )
         progressStore.flushPendingProgress()
         pagingService.removeCachedPages()
-        openPage(preferredByteOffset: byteOffset)
+        openPage(preferredByteOffset: byteOffset, enforceChapterBoundary: false)
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
@@ -1436,7 +1437,7 @@ final class ReaderViewController: UIViewController {
         }
     }
 
-    private func openPage(preferredByteOffset: UInt64?) {
+    private func openPage(preferredByteOffset: UInt64?, enforceChapterBoundary: Bool = true) {
         openingTask?.cancel()
         previousPageTask?.cancel()
         nextPageTask?.cancel()
@@ -1454,12 +1455,15 @@ final class ReaderViewController: UIViewController {
         pagingGeneration += 1
         let generation = pagingGeneration
         let requestStartByteOffset = preferredByteOffset ?? currentPage?.startByteOffset ?? 0
+        let shouldEnforceChapterBoundary = enforceChapterBoundary && preferredByteOffset != nil
         let request = ReaderOpeningRequest(
             bookID: book.id,
             viewportSize: collectionView.bounds.size,
             layout: effectiveReadingLayout(from: activeSettings.layout),
             preferredByteOffset: preferredByteOffset,
-            upperBoundByteOffset: chapterUpperBoundForPage(startingAt: requestStartByteOffset)
+            upperBoundByteOffset: shouldEnforceChapterBoundary
+                ? chapterUpperBoundForPage(startingAt: requestStartByteOffset)
+                : nil
         )
 
         openingTask = Task { [weak self] in
