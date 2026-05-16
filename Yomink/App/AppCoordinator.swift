@@ -4,7 +4,7 @@ import UIKit
 final class AppCoordinator {
     private let window: UIWindow
     private let environment: AppEnvironment
-    private let navigationController = UINavigationController()
+    private let navigationController = YominkNavigationController()
     private let importCoordinator = ImportCoordinator()
     private weak var bookshelfViewController: BookshelfViewController?
 
@@ -144,5 +144,15 @@ final class AppCoordinator {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "\u{597D}", style: .default))
         navigationController.present(alert, animated: true)
+    }
+}
+
+private final class YominkNavigationController: UINavigationController {
+    override var childForHomeIndicatorAutoHidden: UIViewController? {
+        topViewController
+    }
+
+    override var childForScreenEdgesDeferringSystemGestures: UIViewController? {
+        topViewController
     }
 }

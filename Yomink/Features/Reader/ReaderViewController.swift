@@ -56,6 +56,7 @@ final class ReaderViewController: UIViewController {
     private weak var previousInteractivePopGestureDelegate: UIGestureRecognizerDelegate?
     private var previousInteractivePopGestureWasEnabled = true
     private var didCaptureInteractivePopGestureState = false
+    private var pendingHomeIndicatorUpdate: DispatchWorkItem?
     private let maximumResidentPages = 12
     private var lastPaginationMetrics: ReaderViewportMetrics?
     private var usesVerticalScrolling: Bool {
@@ -107,7 +108,11 @@ final class ReaderViewController: UIViewController {
     }
 
     override var prefersHomeIndicatorAutoHidden: Bool {
-        activeSettings.autoHideHomeIndicator
+        true
+    }
+
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge {
+        activeSettings.autoHideHomeIndicator ? .bottom : []
     }
 
     override func viewDidLoad() {
@@ -143,12 +148,14 @@ final class ReaderViewController: UIViewController {
         super.viewWillAppear(animated)
         navigationController?.setNavigationBarHidden(true, animated: animated)
         applyReaderPreferences()
+        requestHomeIndicatorDormancy()
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         configureSwipeBackGesture()
+        requestHomeIndicatorDormancy(after: 0.2)
     }
 
     override func didReceiveMemoryWarning() {
@@ -171,6 +178,8 @@ final class ReaderViewController: UIViewController {
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         stopAutoReading()
+        pendingHomeIndicatorUpdate?.cancel()
+        pendingHomeIndicatorUpdate = nil
         pauseBackgroundWork()
         saveCurrentProgress()
         UIApplication.shared.isIdleTimerDisabled = false
@@ -194,6 +203,7 @@ final class ReaderViewController: UIViewController {
         chapterBoundaryRefreshTask?.cancel()
         bookmarkStateTask?.cancel()
         backgroundWorkResumeTask?.cancel()
+        pendingHomeIndicatorUpdate?.cancel()
         chapterService.cancelParsing(bookID: book.id)
         searchIndexService.cancelIndexing(bookID: book.id)
         NotificationCenter.default.removeObserver(self)
@@ -342,10 +352,34 @@ final class ReaderViewController: UIViewController {
         UIApplication.shared.isIdleTimerDisabled = activeSettings.keepScreenAwake
         UIDevice.current.isBatteryMonitoringEnabled = activeSettings.statusBarItems.contains(.battery)
             || activeSettings.statusBarItems.contains(.batteryPercent)
-        setNeedsUpdateOfHomeIndicatorAutoHidden()
+        requestHomeIndicatorDormancy()
         configureSwipeBackGesture()
         configureCollectionViewForActiveSettings()
         refreshVisibleCellsForActiveSettings()
+    }
+
+    private func requestHomeIndicatorDormancy(after delay: TimeInterval = 0) {
+        pendingHomeIndicatorUpdate?.cancel()
+
+        let updatePreference = { [weak self] in
+            guard let self else {
+                return
+            }
+            self.setNeedsUpdateOfHomeIndicatorAutoHidden()
+            self.setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+            self.navigationController?.setNeedsUpdateOfHomeIndicatorAutoHidden()
+            self.navigationController?.setNeedsUpdateOfScreenEdgesDeferringSystemGestures()
+        }
+
+        guard delay > 0 else {
+            pendingHomeIndicatorUpdate = nil
+            updatePreference()
+            return
+        }
+
+        let workItem = DispatchWorkItem(block: updatePreference)
+        pendingHomeIndicatorUpdate = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
     private func configureSwipeBackGesture() {
@@ -675,6 +709,7 @@ final class ReaderViewController: UIViewController {
         setAutoReadPanelVisible(true, animated: true)
         configureCollectionViewForAutoReading()
         alignContentOffsetToCurrentPage()
+        requestHomeIndicatorDormancy(after: 0.35)
         scheduleAutoReadTick()
     }
 
@@ -693,6 +728,7 @@ final class ReaderViewController: UIViewController {
         alignContentOffsetToCurrentPage()
         updateCurrentPageFromVisiblePage()
         saveCurrentProgress()
+        requestHomeIndicatorDormancy(after: 0.35)
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
@@ -2121,6 +2157,7 @@ final class ReaderViewController: UIViewController {
         currentPage = pages[index]
         updateSessionState(isLoadingNextPage: nextPageTask != nil)
         prefetchPagesNearCurrent()
+        requestHomeIndicatorDormancy(after: 0.35)
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
@@ -2131,6 +2168,7 @@ final class ReaderViewController: UIViewController {
             snapToNearestPageIfNeeded()
         }
         prefetchPagesNearCurrent()
+        requestHomeIndicatorDormancy(after: 0.35)
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
@@ -2203,6 +2241,8 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         pendingTapPageTurnTargetPageIndex = nil
+        pendingHomeIndicatorUpdate?.cancel()
+        pendingHomeIndicatorUpdate = nil
         pauseBackgroundWork()
         if isAutoReading {
             stopAutoReading()
