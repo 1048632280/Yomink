@@ -64,7 +64,7 @@ final class ReaderViewController: UIViewController {
 
     private var pageRenderingSettings: ReadingSettings {
         var settings = activeSettings
-        settings.layout = effectiveReadingLayout(from: activeSettings.layout)
+        settings.layout = effectiveReadingLayout(from: activeSettings)
         return settings
     }
 
@@ -325,7 +325,7 @@ final class ReaderViewController: UIViewController {
         let preferredByteOffset = currentPage?.startByteOffset
         let previousSettings = activeSettings
         let nextSettings = settings.normalized(viewportSize: collectionView.bounds.size)
-        let shouldRebuildPages = previousSettings.layout != nextSettings.layout
+        let shouldRebuildPages = effectiveReadingLayout(from: previousSettings) != effectiveReadingLayout(from: nextSettings)
         activeSettings = nextSettings
         readingSettingsStore.save(activeSettings)
         applyReaderPreferences()
@@ -429,7 +429,14 @@ final class ReaderViewController: UIViewController {
         collectionView.layoutIfNeeded()
     }
 
-    private func effectiveReadingLayout(from layout: ReadingLayout) -> ReadingLayout {
+    private func effectiveReadingLayout(from settings: ReadingSettings) -> ReadingLayout {
+        effectiveReadingLayout(from: settings.layout, statusBarItems: settings.statusBarItems)
+    }
+
+    private func effectiveReadingLayout(
+        from layout: ReadingLayout,
+        statusBarItems: Set<ReadingStatusBarItem>
+    ) -> ReadingLayout {
         var adjustedLayout = layout
         if collectionView.bounds.width > 1,
            collectionView.bounds.height > 1 {
@@ -440,11 +447,28 @@ final class ReaderViewController: UIViewController {
         let edgePadding: CGFloat = 12
         let safeTop = safeAreaInsets.top > 0 ? safeAreaInsets.top + edgePadding : 0
         let safeLeft = safeAreaInsets.left > 0 ? safeAreaInsets.left + edgePadding : 0
-        let safeBottom = safeAreaInsets.bottom > 0 ? safeAreaInsets.bottom + edgePadding : 0
+        let safeBottom = safeAreaInsets.bottom > 0 ? safeAreaInsets.bottom + 2 : 0
         let safeRight = safeAreaInsets.right > 0 ? safeAreaInsets.right + edgePadding : 0
+        let hasTopWidget = statusBarItems.contains(.chapterTitle)
+        let bottomStatusItems: Set<ReadingStatusBarItem> = [
+            .time,
+            .battery,
+            .batteryPercent,
+            .chapterPageProgress,
+            .bookProgress
+        ]
+        let hasBottomWidget = !statusBarItems.isDisjoint(with: bottomStatusItems)
+        let topWidgetInset = hasTopWidget
+            ? safeAreaInsets.top + ReaderStatusBarView.topTextExclusionHeight
+            : 0
+        let bottomWidgetInset = hasBottomWidget
+            ? ReaderStatusBarView.bottomTextExclusionHeight
+            : 0
         adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, safeTop)
+        adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, topWidgetInset)
         adjustedLayout.contentInsets.left = max(adjustedLayout.contentInsets.left, safeLeft)
         adjustedLayout.contentInsets.bottom = max(adjustedLayout.contentInsets.bottom, safeBottom)
+        adjustedLayout.contentInsets.bottom = max(adjustedLayout.contentInsets.bottom, bottomWidgetInset)
         adjustedLayout.contentInsets.right = max(adjustedLayout.contentInsets.right, safeRight)
         return adjustedLayout
     }
@@ -1459,7 +1483,7 @@ final class ReaderViewController: UIViewController {
         let request = ReaderOpeningRequest(
             bookID: book.id,
             viewportSize: collectionView.bounds.size,
-            layout: effectiveReadingLayout(from: activeSettings.layout),
+            layout: effectiveReadingLayout(from: activeSettings),
             preferredByteOffset: preferredByteOffset,
             upperBoundByteOffset: shouldEnforceChapterBoundary
                 ? chapterUpperBoundForPage(startingAt: requestStartByteOffset)
@@ -1618,7 +1642,7 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             startByteOffset: lastPage.endByteOffset,
             pageIndex: lastPage.pageIndex + 1,
-            layout: effectiveReadingLayout(from: activeSettings.layout),
+            layout: effectiveReadingLayout(from: activeSettings),
             upperBoundByteOffset: chapterUpperBoundForPage(startingAt: lastPage.endByteOffset)
         )
         let generation = pagingGeneration
@@ -1683,7 +1707,7 @@ final class ReaderViewController: UIViewController {
             bookID: book.id,
             endByteOffset: firstPage.startByteOffset,
             pageIndex: max(0, firstPage.pageIndex - 1),
-            layout: effectiveReadingLayout(from: activeSettings.layout),
+            layout: effectiveReadingLayout(from: activeSettings),
             lowerBoundByteOffset: chapterLowerBoundForPreviousPage(endingAt: firstPage.startByteOffset)
         )
         let generation = pagingGeneration

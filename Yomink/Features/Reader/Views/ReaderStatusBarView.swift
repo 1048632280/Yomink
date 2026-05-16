@@ -1,6 +1,9 @@
 import UIKit
 
 final class ReaderStatusBarView: UIView {
+    static let topTextExclusionHeight: CGFloat = 34
+    static let bottomTextExclusionHeight: CGFloat = 36
+
     struct Configuration: Hashable {
         let state: ReaderSessionState
         let settings: ReadingSettings
@@ -114,17 +117,17 @@ final class ReaderStatusBarView: UIView {
         addSubview(bottomRightStackView)
 
         NSLayoutConstraint.activate([
-            topLeftLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: 6),
+            topLeftLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
             topLeftLabel.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
             topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
 
             bottomLeftStackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
-            bottomLeftStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
+            bottomLeftStackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
             bottomLeftStackView.trailingAnchor.constraint(lessThanOrEqualTo: bottomRightStackView.leadingAnchor, constant: -12),
             bottomLeftStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48),
 
             bottomRightStackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            bottomRightStackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor),
+            bottomRightStackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
             bottomRightStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48)
         ])
 
