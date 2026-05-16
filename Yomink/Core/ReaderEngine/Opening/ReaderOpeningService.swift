@@ -6,6 +6,10 @@ enum ReaderOpeningError: Error {
 }
 
 final class ReaderOpeningService: @unchecked Sendable {
+    // Forward opening only needs enough text to fill one visible page; keeping this below the mmap guard cap
+    // avoids decoding a full 1MB window during catalog jumps.
+    private static let forwardPageWindowLength: UInt64 = 256 * 1024
+
     private let bookRepository: BookRepository
     private let progressStore: ReadingProgressStore
 
@@ -36,7 +40,7 @@ final class ReaderOpeningService: @unchecked Sendable {
             } ?? mapping.fileSize
             let upperBound = min(
                 requestedUpperBound,
-                clampedStart + BookFileMapping.maximumWindowLength
+                clampedStart + Self.forwardPageWindowLength
             )
             let windowData = try mapping.bytes(in: clampedStart..<upperBound)
             let decodedWindow = try TextDecoder().decodeBoundedWindow(data: windowData, encoding: book.encoding)

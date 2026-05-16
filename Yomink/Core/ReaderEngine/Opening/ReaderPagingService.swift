@@ -8,6 +8,8 @@ enum ReaderPagingError: Error {
 
 final class ReaderPagingService: @unchecked Sendable {
     private static let previousPageSearchLength = BookFileMapping.maximumWindowLength
+    // Forward paging renders one screen at a time, so a smaller window keeps taps and chapter jumps responsive.
+    private static let forwardPageWindowLength: UInt64 = 256 * 1024
 
     private let bookRepository: BookRepository
     private let pageCache: ReaderPageCache
@@ -45,7 +47,7 @@ final class ReaderPagingService: @unchecked Sendable {
                 startByteOffset: request.startByteOffset,
                 upperBound: min(
                     requestedUpperBound,
-                    request.startByteOffset + BookFileMapping.maximumWindowLength
+                    request.startByteOffset + Self.forwardPageWindowLength
                 ),
                 pageIndex: request.pageIndex,
                 layout: request.layout

@@ -41,6 +41,8 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private var didScrollToCurrentChapter = false
     private var shouldHideCollectionUntilInitialScroll = false
     private var didApplyInitialSnapshot = false
+    private var needsCurrentChapterScrollRetry = false
+    private var didFinalizeInitialChapterScroll = false
     private var isApplyingSnapshot = false
     private var pendingSnapshotUpdate: Bool?
     private var pendingScrollToTopAfterSnapshot = false
@@ -115,6 +117,15 @@ final class CatalogAndBookmarksViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         scrollToCurrentChapterIfNeeded()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if !didFinalizeInitialChapterScroll || needsCurrentChapterScrollRetry {
+            didFinalizeInitialChapterScroll = true
+            didScrollToCurrentChapter = false
+            scrollToCurrentChapterIfNeeded()
+        }
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -348,21 +359,32 @@ final class CatalogAndBookmarksViewController: UIViewController {
               collectionView.numberOfItems(inSection: 0) > currentIndex else {
             return
         }
+        collectionView.layoutIfNeeded()
         didScrollToCurrentChapter = true
-        let itemCount = collectionView.numberOfItems(inSection: 0)
-        let scrollPosition: UICollectionView.ScrollPosition
-        if currentIndex <= 1 {
-            scrollPosition = .top
-        } else if currentIndex >= max(0, itemCount - 2) {
-            scrollPosition = .bottom
+        needsCurrentChapterScrollRetry = false
+        let indexPath = IndexPath(item: currentIndex, section: 0)
+        if let attributes = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath) {
+            let centeredOffsetY = attributes.frame.midY - collectionView.bounds.height * 0.5
+            let minOffsetY = -collectionView.adjustedContentInset.top
+            let maxOffsetY = max(
+                minOffsetY,
+                collectionView.contentSize.height
+                    - collectionView.bounds.height
+                    + collectionView.adjustedContentInset.bottom
+            )
+            collectionView.setContentOffset(
+                CGPoint(x: collectionView.contentOffset.x, y: min(max(centeredOffsetY, minOffsetY), maxOffsetY)),
+                animated: false
+            )
         } else {
-            scrollPosition = .centeredVertically
+            didScrollToCurrentChapter = false
+            needsCurrentChapterScrollRetry = true
+            collectionView.scrollToItem(
+                at: indexPath,
+                at: .centeredVertically,
+                animated: false
+            )
         }
-        collectionView.scrollToItem(
-            at: IndexPath(item: currentIndex, section: 0),
-            at: scrollPosition,
-            animated: false
-        )
         lastContentOffsetY = collectionView.contentOffset.y
         updateEdgeJumpTargetForScroll()
         if shouldHideCollectionUntilInitialScroll {
@@ -458,17 +480,18 @@ final class CatalogAndBookmarksViewController: UIViewController {
         closePage()
     }
 
-    private func closePage(completion: (() -> Void)? = nil) {
+    private func closePage(animated: Bool = true, completion: (() -> Void)? = nil) {
         guard beginClosing() else {
             return
         }
         if let navigationController,
            navigationController.viewControllers.first !== self {
-            navigationController.popViewController(animated: true)
+            navigationController.popViewController(animated: animated)
             guard let completion else {
                 return
             }
-            if let coordinator = navigationController.transitionCoordinator {
+            if animated,
+               let coordinator = navigationController.transitionCoordinator {
                 coordinator.animate(alongsideTransition: nil) { _ in
                     completion()
                 }
@@ -476,7 +499,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
                 completion()
             }
         } else {
-            dismiss(animated: true, completion: completion)
+            dismiss(animated: animated, completion: completion)
         }
     }
 
@@ -551,17 +574,12 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
         }
 
         switch item {
-        case .chapter(_, _), .bookmark(_):
-            closePage { [onChapterSelected, onBookmarkSelected] in
-                switch item {
-                case .chapter(let chapter, _):
-                    onChapterSelected?(chapter)
-                case .bookmark(let bookmark):
-                    onBookmarkSelected?(bookmark)
-                case .empty:
-                    break
-                }
-            }
+        case .chapter(let chapter, _):
+            onChapterSelected?(chapter)
+            closePage(animated: false)
+        case .bookmark(let bookmark):
+            onBookmarkSelected?(bookmark)
+            closePage(animated: false)
         case .empty:
             return
         }

@@ -606,6 +606,7 @@ final class ReaderViewController: UIViewController {
               !isLoadingCatalog else {
             return
         }
+        updateCurrentPageFromVisiblePage()
         isLoadingCatalog = true
         keepsChapterParsingActiveWhileCovered = true
         chapterService.resumeParsing(bookID: book.id)
@@ -678,7 +679,8 @@ final class ReaderViewController: UIViewController {
         }
         chapterRefreshTask?.cancel()
         chapterRefreshTask = nil
-        jumpToByteOffset(chapter.byteOffset)
+        updateCurrentPageFromVisiblePage()
+        jumpToByteOffset(chapter.byteOffset, enforceChapterBoundary: true)
     }
 
     private func jumpToBookmark(_ bookmark: ReadingBookmark) {
@@ -705,11 +707,10 @@ final class ReaderViewController: UIViewController {
         }
     }
 
-    private func jumpToByteOffset(_ byteOffset: UInt64) {
+    private func jumpToByteOffset(_ byteOffset: UInt64, enforceChapterBoundary: Bool = true) {
         let clampedByteOffset = min(byteOffset, book.fileSize.saturatingLastByteOffset)
         stopAutoReading()
         pauseBackgroundWork()
-        saveCurrentProgress()
         progressStore.remember(
             ReadingProgress(
                 bookID: book.id,
@@ -717,9 +718,7 @@ final class ReaderViewController: UIViewController {
                 updatedAt: Date()
             )
         )
-        progressStore.flushPendingProgress()
-        pagingService.removeCachedPages()
-        openPage(preferredByteOffset: clampedByteOffset, enforceChapterBoundary: false)
+        openPage(preferredByteOffset: clampedByteOffset, enforceChapterBoundary: enforceChapterBoundary)
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
