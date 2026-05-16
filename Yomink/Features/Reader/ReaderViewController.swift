@@ -1097,6 +1097,9 @@ final class ReaderViewController: UIViewController {
     private func scheduleChapterBoundaryRefresh(after delay: TimeInterval = 1.5, attempts: Int = 4) {
         chapterBoundaryRefreshTask?.cancel()
         chapterBoundaryRefreshTask = Task { @MainActor [weak self] in
+            guard let self else {
+                return
+            }
             for attempt in 0..<attempts {
                 let refreshDelay = attempt == 0 ? delay : 2.0
                 do {
@@ -1105,9 +1108,6 @@ final class ReaderViewController: UIViewController {
                     return
                 }
 
-                guard let self else {
-                    return
-                }
                 guard !self.isAutoReading,
                       !self.collectionView.isDragging,
                       !self.collectionView.isDecelerating,

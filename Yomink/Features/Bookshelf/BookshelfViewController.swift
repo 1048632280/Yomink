@@ -142,7 +142,7 @@ final class BookshelfViewController: UIViewController {
 
             cell.accessories = []
             switch item {
-            case .book(let bookItem):
+            case .book:
                 if !isSelectingBooks {
                     cell.accessories = [.disclosureIndicator()]
                 }
