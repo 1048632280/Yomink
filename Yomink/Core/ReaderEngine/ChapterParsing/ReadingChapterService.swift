@@ -1,7 +1,7 @@
 import Foundation
 
 final class ReadingChapterService: @unchecked Sendable {
-    private static let batchSize = 32
+    private static let batchSize = 96
 
     private let bookRepository: BookRepository
     private let chapterRepository: ChapterRepository
@@ -98,6 +98,7 @@ final class ReadingChapterService: @unchecked Sendable {
         var sortIndex = 0
         var pendingChapters: [ReadingChapter] = []
         var seenChapters: [ChapterCandidate] = []
+        var didPersistInitialBatch = false
 
         while windowStartByteOffset < mapping.fileSize {
             if Task.isCancelled {
@@ -128,9 +129,11 @@ final class ReadingChapterService: @unchecked Sendable {
                 sortIndex += 1
             }
 
-            if pendingChapters.count >= Self.batchSize {
+            if pendingChapters.count >= Self.batchSize
+                || (!didPersistInitialBatch && !pendingChapters.isEmpty) {
                 try chapterRepository.insertChapters(pendingChapters)
                 pendingChapters.removeAll(keepingCapacity: true)
+                didPersistInitialBatch = true
             }
 
             guard windowEndByteOffset < mapping.fileSize else {
@@ -143,9 +146,9 @@ final class ReadingChapterService: @unchecked Sendable {
             )
             windowStartByteOffset = nextStart > windowStartByteOffset ? nextStart : windowEndByteOffset
 
-            // Catalog parsing is useful but non-urgent; this cooperative pause keeps
-            // long TXT scans from keeping CPU warm during quiet reading.
-            try await Task.sleep(nanoseconds: 25_000_000)
+            // Keep chapter parsing cooperative without adding seconds of fixed delay
+            // on large TXT files; pause/cancel still handles active reading gestures.
+            try await Task.sleep(nanoseconds: 3_000_000)
         }
 
         try chapterRepository.insertChapters(pendingChapters)

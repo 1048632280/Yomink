@@ -1481,8 +1481,7 @@ final class ReaderViewController: UIViewController {
                 UIView.performWithoutAnimation {
                     collectionView.setContentOffset(.zero, animated: false)
                 }
-                loadNextPageIfNeeded()
-                loadPreviousPageIfNeeded()
+                prepareAdjacentPagesAfterChapterRefresh(generation: generation)
             } catch {
                 guard pagingGeneration == generation else {
                     return
@@ -1493,6 +1492,44 @@ final class ReaderViewController: UIViewController {
         }
     }
 
+    private func prepareAdjacentPagesAfterChapterRefresh(generation: Int) {
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let loadedChapters = try await chapterService.chapters(bookID: book.id)
+                guard pagingGeneration == generation else {
+                    return
+                }
+                chapters = loadedChapters
+                updateChrome()
+            } catch {
+                guard pagingGeneration == generation else {
+                    return
+                }
+                chapters = []
+            }
+
+            if let currentPage,
+               pageCrossesChapterBoundary(currentPage) {
+                reflowCurrentPageForChapterBoundaries()
+                return
+            }
+
+            loadNextPageIfNeeded()
+            loadPreviousPageIfNeeded()
+        }
+    }
+
+    private func pageCrossesChapterBoundary(_ page: ReaderPage) -> Bool {
+        guard let upperBound = chapterUpperBoundForPage(startingAt: page.startByteOffset) else {
+            return false
+        }
+        return page.endByteOffset > upperBound
+    }
+
     private func applyInitialPage(_ page: ReaderPage) {
         pages = [page]
         currentPage = page
@@ -1501,8 +1538,7 @@ final class ReaderViewController: UIViewController {
         updateSessionState(isLoadingNextPage: false)
         chapterService.scheduleParsing(bookID: book.id)
         searchIndexService.scheduleIndexing(bookID: book.id, startingAt: page.startByteOffset)
-        refreshChapters()
-        scheduleChapterBoundaryRefresh()
+        scheduleChapterBoundaryRefresh(after: 0.35, attempts: 30)
     }
 
     @discardableResult

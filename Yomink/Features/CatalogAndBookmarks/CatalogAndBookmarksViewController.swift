@@ -37,6 +37,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
     private var lastContentOffsetY: CGFloat = 0
     private var chapterSearchText = ""
     private var didScrollToCurrentChapter = false
+    private var shouldHideCollectionUntilInitialScroll = false
     private let searchBar = UISearchBar(frame: .zero)
     private var searchBarHeightConstraint: NSLayoutConstraint?
     private lazy var edgeJumpButton = UIBarButtonItem(
@@ -81,12 +82,14 @@ final class CatalogAndBookmarksViewController: UIViewController {
         configureSearchBar()
         configureCollectionView()
         configureDataSource()
+        shouldHideCollectionUntilInitialScroll = currentChapterIndex() != nil
+        collectionView.alpha = shouldHideCollectionUntilInitialScroll ? 0 : 1
         updateSearchBarVisibility(animated: false)
         applySnapshot()
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
         scrollToCurrentChapterIfNeeded()
     }
 
@@ -128,6 +131,9 @@ final class CatalogAndBookmarksViewController: UIViewController {
         searchBar.delegate = self
         searchBar.placeholder = "\u{641C}\u{7D22}"
         searchBar.searchBarStyle = .minimal
+        searchBar.searchTextField.placeholder = "\u{641C}\u{7D22}"
+        searchBar.searchTextField.clearButtonMode = .whileEditing
+        searchBar.searchTextField.returnKeyType = .search
         searchBar.autocapitalizationType = .none
         searchBar.autocorrectionType = .no
         searchBar.showsCancelButton = false
@@ -179,7 +185,9 @@ final class CatalogAndBookmarksViewController: UIViewController {
         var snapshot = NSDiffableDataSourceSnapshot<Section, Item>()
         snapshot.appendSections([.main])
         snapshot.appendItems(itemsForSelectedSegment(), toSection: .main)
-        dataSource?.apply(snapshot, animatingDifferences: animatingDifferences)
+        dataSource?.apply(snapshot, animatingDifferences: animatingDifferences) { [weak self] in
+            self?.scrollToCurrentChapterIfNeeded()
+        }
     }
 
     private func itemsForSelectedSegment() -> [Item] {
@@ -265,6 +273,19 @@ final class CatalogAndBookmarksViewController: UIViewController {
         )
         lastContentOffsetY = collectionView.contentOffset.y
         updateEdgeJumpTargetForScroll()
+        if shouldHideCollectionUntilInitialScroll {
+            shouldHideCollectionUntilInitialScroll = false
+            collectionView.alpha = 1
+        }
+    }
+
+    private func localizeSearchBarCancelButton() {
+        for button in searchBar.yominkRecursiveSubviews.compactMap({ $0 as? UIButton }) {
+            guard button.title(for: .normal) != nil else {
+                continue
+            }
+            button.setTitle("\u{53D6}\u{6D88}", for: .normal)
+        }
     }
 
     private func scrollToTop(animated: Bool) {
@@ -420,6 +441,9 @@ extension CatalogAndBookmarksViewController: UICollectionViewDelegate {
 extension CatalogAndBookmarksViewController: UISearchBarDelegate {
     func searchBarTextDidBeginEditing(_ searchBar: UISearchBar) {
         searchBar.setShowsCancelButton(true, animated: true)
+        DispatchQueue.main.async { [weak self] in
+            self?.localizeSearchBarCancelButton()
+        }
     }
 
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
@@ -445,5 +469,11 @@ extension CatalogAndBookmarksViewController: UISearchBarDelegate {
         }
         applySnapshot(animatingDifferences: true)
         scrollToTop(animated: false)
+    }
+}
+
+private extension UIView {
+    var yominkRecursiveSubviews: [UIView] {
+        subviews + subviews.flatMap(\.yominkRecursiveSubviews)
     }
 }
