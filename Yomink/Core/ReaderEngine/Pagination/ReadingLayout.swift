@@ -173,11 +173,15 @@ struct ReadingLayout: Hashable, Codable, Sendable {
 
     func contentRect(in bounds: CGRect) -> CGRect {
         // CoreText pagination and drawing both use the flipped bottom-left coordinate space.
-        CGRect(
-            x: contentInsets.left,
-            y: contentInsets.bottom,
-            width: max(1, bounds.width - contentInsets.left - contentInsets.right),
-            height: max(1, bounds.height - contentInsets.top - contentInsets.bottom)
+        let minX = ceil(contentInsets.left)
+        let minY = ceil(contentInsets.bottom)
+        let maxX = floor(bounds.width - contentInsets.right)
+        let maxY = floor(bounds.height - contentInsets.top)
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: max(1, maxX - minX),
+            height: max(1, maxY - minY)
         )
     }
 }

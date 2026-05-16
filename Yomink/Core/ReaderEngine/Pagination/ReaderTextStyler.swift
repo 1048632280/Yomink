@@ -8,6 +8,7 @@ enum ReaderTextStyler {
             string: text,
             attributes: bodyAttributes(layout: layout, foregroundColor: foregroundColor)
         )
+        applyBodyParagraphStyle(to: attributedString, layout: layout)
         applyChapterTitleStyle(to: attributedString, layout: layout, foregroundColor: foregroundColor)
         return attributedString
     }
@@ -26,17 +27,35 @@ enum ReaderTextStyler {
                 size: layout.fontSize,
                 weight: layout.bodyFontWeight
             ),
-            NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle(
-                lineSpacing: layout.lineSpacing,
-                paragraphSpacing: layout.paragraphSpacing,
-                firstLineIndent: layout.firstLineIndent * layout.fontSize
-            ),
             NSAttributedString.Key(kCTKernAttributeName as String): layout.characterSpacing
         ]
         if let foregroundColor {
             attributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = foregroundColor
         }
         return attributes
+    }
+
+    private static func applyBodyParagraphStyle(
+        to attributedString: NSMutableAttributedString,
+        layout: ReadingLayout
+    ) {
+        for paragraphRange in paragraphRanges(in: attributedString.string) {
+            let firstLineIndent = paragraphHasSourceIndent(in: attributedString.string, range: paragraphRange)
+                ? 0
+                : layout.firstLineIndent * layout.fontSize
+            attributedString.addAttributes(
+                [
+                    NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle(
+                        lineSpacing: layout.lineSpacing,
+                        paragraphSpacing: layout.paragraphSpacing,
+                        firstLineIndent: firstLineIndent,
+                        alignment: .justified,
+                        lineBreakMode: .byCharWrapping
+                    )
+                ],
+                range: NSRange(paragraphRange, in: attributedString.string)
+            )
+        }
     }
 
     private static func applyChapterTitleStyle(
@@ -59,7 +78,9 @@ enum ReaderTextStyler {
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle(
                 lineSpacing: layout.chapterTitleLineSpacing,
                 paragraphSpacing: layout.chapterTitleParagraphSpacing,
-                firstLineIndent: 0
+                firstLineIndent: 0,
+                alignment: .left,
+                lineBreakMode: .byCharWrapping
             ),
             NSAttributedString.Key(kCTKernAttributeName as String): layout.chapterTitleCharacterSpacing
         ]
@@ -101,6 +122,36 @@ enum ReaderTextStyler {
         return ranges
     }
 
+    private static func paragraphRanges(in text: String) -> [Range<String.Index>] {
+        guard !text.isEmpty else {
+            return []
+        }
+
+        var ranges: [Range<String.Index>] = []
+        var startIndex = text.startIndex
+        while startIndex < text.endIndex {
+            if let newlineIndex = text[startIndex..<text.endIndex].firstIndex(where: \.isNewline) {
+                let endIndex = text.index(after: newlineIndex)
+                ranges.append(startIndex..<endIndex)
+                startIndex = endIndex
+            } else {
+                ranges.append(startIndex..<text.endIndex)
+                startIndex = text.endIndex
+            }
+        }
+        return ranges
+    }
+
+    private static func paragraphHasSourceIndent(in text: String, range: Range<String.Index>) -> Bool {
+        guard let firstCharacter = text[range].first,
+              !firstCharacter.isNewline else {
+            return false
+        }
+        return firstCharacter.unicodeScalars.allSatisfy { scalar in
+            CharacterSet.whitespaces.contains(scalar) || scalar.value == 0x3000
+        }
+    }
+
     private static func font(name: String, size: CGFloat, weight: CGFloat) -> CTFont {
         let baseFont = CTFontCreateWithName(name as CFString, size, nil)
         guard weight > 0 else {
@@ -118,33 +169,51 @@ enum ReaderTextStyler {
     private static func paragraphStyle(
         lineSpacing: CGFloat,
         paragraphSpacing: CGFloat,
-        firstLineIndent: CGFloat
+        firstLineIndent: CGFloat,
+        alignment: CTTextAlignment,
+        lineBreakMode: CTLineBreakMode
     ) -> CTParagraphStyle {
         var resolvedLineSpacing = lineSpacing
         var resolvedParagraphSpacing = paragraphSpacing
         var resolvedFirstLineIndent = firstLineIndent
+        var resolvedAlignment = alignment
+        var resolvedLineBreakMode = lineBreakMode
         return withUnsafePointer(to: &resolvedLineSpacing) { lineSpacingPointer in
             withUnsafePointer(to: &resolvedParagraphSpacing) { paragraphSpacingPointer in
                 withUnsafePointer(to: &resolvedFirstLineIndent) { firstLineIndentPointer in
-                    let settings = [
-                        CTParagraphStyleSetting(
-                            spec: .lineSpacingAdjustment,
-                            valueSize: MemoryLayout<CGFloat>.size,
-                            value: UnsafeRawPointer(lineSpacingPointer)
-                        ),
-                        CTParagraphStyleSetting(
-                            spec: .paragraphSpacing,
-                            valueSize: MemoryLayout<CGFloat>.size,
-                            value: UnsafeRawPointer(paragraphSpacingPointer)
-                        ),
-                        CTParagraphStyleSetting(
-                            spec: .firstLineHeadIndent,
-                            valueSize: MemoryLayout<CGFloat>.size,
-                            value: UnsafeRawPointer(firstLineIndentPointer)
-                        )
-                    ]
-                    return settings.withUnsafeBufferPointer { buffer in
-                        CTParagraphStyleCreate(buffer.baseAddress, buffer.count)
+                    withUnsafePointer(to: &resolvedAlignment) { alignmentPointer in
+                        withUnsafePointer(to: &resolvedLineBreakMode) { lineBreakModePointer in
+                            let settings = [
+                                CTParagraphStyleSetting(
+                                    spec: .lineSpacingAdjustment,
+                                    valueSize: MemoryLayout<CGFloat>.size,
+                                    value: UnsafeRawPointer(lineSpacingPointer)
+                                ),
+                                CTParagraphStyleSetting(
+                                    spec: .paragraphSpacing,
+                                    valueSize: MemoryLayout<CGFloat>.size,
+                                    value: UnsafeRawPointer(paragraphSpacingPointer)
+                                ),
+                                CTParagraphStyleSetting(
+                                    spec: .firstLineHeadIndent,
+                                    valueSize: MemoryLayout<CGFloat>.size,
+                                    value: UnsafeRawPointer(firstLineIndentPointer)
+                                ),
+                                CTParagraphStyleSetting(
+                                    spec: .alignment,
+                                    valueSize: MemoryLayout<CTTextAlignment>.size,
+                                    value: UnsafeRawPointer(alignmentPointer)
+                                ),
+                                CTParagraphStyleSetting(
+                                    spec: .lineBreakMode,
+                                    valueSize: MemoryLayout<CTLineBreakMode>.size,
+                                    value: UnsafeRawPointer(lineBreakModePointer)
+                                )
+                            ]
+                            return settings.withUnsafeBufferPointer { buffer in
+                                CTParagraphStyleCreate(buffer.baseAddress, buffer.count)
+                            }
+                        }
                     }
                 }
             }

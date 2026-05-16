@@ -1,3 +1,4 @@
+import CoreText
 import XCTest
 @testable import Yomink
 
@@ -67,5 +68,51 @@ final class ReaderEngineModelTests: XCTestCase {
 
         XCTAssertEqual(emptyState.progressFraction, 0)
         XCTAssertEqual(oversizedState.progressFraction, 1)
+    }
+
+    func testReaderTextStylerDoesNotStackSyntheticIndentOnSourceIndent() throws {
+        var layout = ReadingLayout.defaultPhone
+        layout.fontSize = 18
+        layout.firstLineIndent = 2
+        let text = "　　已有缩进\n没有缩进"
+        let attributedText = ReaderTextStyler.attributedText(for: text, layout: layout)
+
+        let firstParagraphStyle = try XCTUnwrap(paragraphStyle(in: attributedText, at: 0))
+        let secondParagraphLocation = (text as NSString).range(of: "没有缩进").location
+        let secondParagraphStyle = try XCTUnwrap(paragraphStyle(in: attributedText, at: secondParagraphLocation))
+
+        XCTAssertEqual(firstLineHeadIndent(in: firstParagraphStyle), 0)
+        XCTAssertEqual(firstLineHeadIndent(in: secondParagraphStyle), 36)
+        XCTAssertEqual(alignment(in: secondParagraphStyle), .justified)
+    }
+
+    private func paragraphStyle(in attributedText: NSAttributedString, at location: Int) -> CTParagraphStyle? {
+        attributedText.attribute(
+            NSAttributedString.Key(kCTParagraphStyleAttributeName as String),
+            at: location,
+            effectiveRange: nil
+        ) as? CTParagraphStyle
+    }
+
+    private func firstLineHeadIndent(in paragraphStyle: CTParagraphStyle) -> CGFloat {
+        var value: CGFloat = 0
+        CTParagraphStyleGetValueForSpecifier(
+            paragraphStyle,
+            .firstLineHeadIndent,
+            MemoryLayout<CGFloat>.size,
+            &value
+        )
+        return value
+    }
+
+    private func alignment(in paragraphStyle: CTParagraphStyle) -> CTTextAlignment {
+        var value = CTTextAlignment.natural
+        CTParagraphStyleGetValueForSpecifier(
+            paragraphStyle,
+            .alignment,
+            MemoryLayout<CTTextAlignment>.size,
+            &value
+        )
+        return value
     }
 }

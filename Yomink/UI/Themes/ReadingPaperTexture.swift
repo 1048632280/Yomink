@@ -28,7 +28,8 @@ enum ReadingPaperTexture {
             let context = rendererContext.cgContext
             let bounds = CGRect(origin: .zero, size: size)
 
-            UIColor(red: 0.968, green: 0.967, blue: 0.952, alpha: 1).setFill()
+            // 🌟 1. 替换基础底色为“复古香色” (暖黄/羊皮纸色)
+            UIColor(red: 0.925, green: 0.886, blue: 0.812, alpha: 1).setFill()
             context.fill(bounds)
 
             var random = SeededRandom(seed: 0x9F42_BA17)
@@ -44,12 +45,13 @@ enum ReadingPaperTexture {
         bounds: CGRect,
         random: inout SeededRandom
     ) {
-        for _ in 0..<34 {
+        // 增加晕染带的数量，模拟老纸张受潮泛黄的不均匀感
+        for _ in 0..<50 { 
             let x = random.nextCGFloat(in: bounds.minX...bounds.maxX)
-            let width = random.nextCGFloat(in: 2.5...11)
-            let alpha = random.nextCGFloat(in: 0.006...0.018)
-            let white = random.nextBool() ? CGFloat(1) : CGFloat(0.74)
-            context.setFillColor(UIColor(white: white, alpha: alpha).cgColor)
+            let width = random.nextCGFloat(in: 4.0...15.0)
+            let alpha = random.nextCGFloat(in: 0.01...0.025)
+            // 🌟 2. 晕染颜色改为深褐色，而不是灰色
+            context.setFillColor(UIColor(red: 0.65, green: 0.55, blue: 0.40, alpha: alpha).cgColor)
             context.fill(CGRect(x: x, y: bounds.minY, width: width, height: bounds.height))
         }
     }
@@ -60,19 +62,24 @@ enum ReadingPaperTexture {
         random: inout SeededRandom
     ) {
         context.setLineCap(.round)
-        for _ in 0..<260 {
+        for _ in 0..<300 {
             let x = random.nextCGFloat(in: bounds.minX...bounds.maxX)
             let y = random.nextCGFloat(in: -bounds.height * 0.12...bounds.height)
-            let length = random.nextCGFloat(in: bounds.height * 0.18...bounds.height * 0.92)
-            let lineWidth = random.nextCGFloat(in: 0.18...0.72)
-            let alpha = random.nextCGFloat(in: 0.010...0.032)
-            let white = random.nextBool() ? CGFloat(0.62) : CGFloat(1)
+            let length = random.nextCGFloat(in: bounds.height * 0.10...bounds.height * 0.60)
+            let lineWidth = random.nextCGFloat(in: 0.2...0.8)
+            let alpha = random.nextCGFloat(in: 0.015...0.04)
+            
+            // 🌟 3. 纸浆纤维也改为枯草色/褐色
+            let isDarkFiber = random.nextBool()
+            let r: CGFloat = isDarkFiber ? 0.50 : 0.85
+            let g: CGFloat = isDarkFiber ? 0.40 : 0.80
+            let b: CGFloat = isDarkFiber ? 0.30 : 0.70
 
-            context.setStrokeColor(UIColor(white: white, alpha: alpha).cgColor)
+            context.setStrokeColor(UIColor(red: r, green: g, blue: b, alpha: alpha).cgColor)
             context.setLineWidth(lineWidth)
             context.beginPath()
             context.move(to: CGPoint(x: x, y: max(bounds.minY, y)))
-            context.addLine(to: CGPoint(x: x + random.nextCGFloat(in: -0.28...0.28), y: min(bounds.maxY, y + length)))
+            context.addLine(to: CGPoint(x: x + random.nextCGFloat(in: -0.5...0.5), y: min(bounds.maxY, y + length)))
             context.strokePath()
         }
     }
@@ -82,16 +89,17 @@ enum ReadingPaperTexture {
         bounds: CGRect,
         random: inout SeededRandom
     ) {
-        context.setLineWidth(0.25)
+        context.setLineWidth(0.3)
         var y = bounds.minY + 1
         while y < bounds.maxY {
-            let alpha = random.nextCGFloat(in: 0.004...0.011)
-            context.setStrokeColor(UIColor(white: 0.70, alpha: alpha).cgColor)
+            let alpha = random.nextCGFloat(in: 0.005...0.015)
+            // 🌟 4. 横向纹理改为浅褐色
+            context.setStrokeColor(UIColor(red: 0.6, green: 0.5, blue: 0.4, alpha: alpha).cgColor)
             context.beginPath()
             context.move(to: CGPoint(x: bounds.minX, y: y))
-            context.addLine(to: CGPoint(x: bounds.maxX, y: y + random.nextCGFloat(in: -0.08...0.08)))
+            context.addLine(to: CGPoint(x: bounds.maxX, y: y + random.nextCGFloat(in: -0.1...0.1)))
             context.strokePath()
-            y += random.nextCGFloat(in: 3.5...7.5)
+            y += random.nextCGFloat(in: 2.0...6.0)
         }
     }
 
@@ -100,17 +108,19 @@ enum ReadingPaperTexture {
         bounds: CGRect,
         random: inout SeededRandom
     ) {
-        for _ in 0..<620 {
-            let size = random.nextCGFloat(in: 0.18...0.65)
-            let alpha = random.nextCGFloat(in: 0.006...0.020)
-            let white = random.nextBool() ? CGFloat(0.60) : CGFloat(1)
+        // 增加杂质斑点，让纸张看起来更有质感
+        for _ in 0..<800 {
+            let size = random.nextCGFloat(in: 0.2...0.8)
+            let alpha = random.nextCGFloat(in: 0.01...0.035)
+            // 🌟 5. 杂质设为深棕色
+            context.setFillColor(UIColor(red: 0.4, green: 0.3, blue: 0.2, alpha: alpha).cgColor)
+            
             let rect = CGRect(
                 x: random.nextCGFloat(in: bounds.minX...bounds.maxX),
                 y: random.nextCGFloat(in: bounds.minY...bounds.maxY),
                 width: size,
                 height: size
             )
-            context.setFillColor(UIColor(white: white, alpha: alpha).cgColor)
             context.fill(rect)
         }
     }

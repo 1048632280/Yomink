@@ -12,9 +12,12 @@ struct ReadingThemePalette {
         case .paper:
             return ReadingThemePalette(
                 background: ReadingPaperTexture.backgroundColor(),
-                primaryText: UIColor(red: 0.10, green: 0.11, blue: 0.12, alpha: 1),
-                secondaryText: UIColor(red: 0.42, green: 0.43, blue: 0.44, alpha: 1),
-                chromeBackground: UIColor(red: 0.968, green: 0.967, blue: 0.952, alpha: 0.88)
+                // 🌟 正文颜色：改为一种带有古籍感的深墨棕色 (Dark Ink)
+                primaryText: UIColor(red: 0.18, green: 0.15, blue: 0.12, alpha: 1),
+                // 次要文字颜色 (如进度百分比)
+                secondaryText: UIColor(red: 0.45, green: 0.40, blue: 0.35, alpha: 1),
+                // 🌟 菜单栏背景：取用比纸张底色稍微深一点的颜色，加上毛玻璃透明度
+                chromeBackground: UIColor(red: 0.90, green: 0.86, blue: 0.78, alpha: 0.90)
             )
         case .white:
             return ReadingThemePalette(
