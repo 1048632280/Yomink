@@ -473,7 +473,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
                     completion()
                 }
             } else {
-                DispatchQueue.main.async(execute: completion)
+                completion()
             }
         } else {
             dismiss(animated: true, completion: completion)

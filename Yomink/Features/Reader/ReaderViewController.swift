@@ -225,7 +225,9 @@ final class ReaderViewController: UIViewController {
     }
 
     deinit {
-        invalidateAutoReadDisplayLink()
+        autoReadDisplayLink?.invalidate()
+        autoReadDisplayLink = nil
+        lastAutoReadFrameTimestamp = nil
         Task { @MainActor in
             UIApplication.shared.isIdleTimerDisabled = false
             UIDevice.current.isBatteryMonitoringEnabled = false
@@ -2368,7 +2370,7 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         if isAutoReading {
             return CGSize(width: collectionView.bounds.width, height: autoReadPageHeight())
         }
-        collectionView.bounds.size
+        return collectionView.bounds.size
     }
 }
 
