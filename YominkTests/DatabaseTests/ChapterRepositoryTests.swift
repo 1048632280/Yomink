@@ -60,4 +60,52 @@ final class ChapterRepositoryTests: XCTestCase {
 
         XCTAssertFalse(try repository.isParsingCompleted(bookID: bookID))
     }
+
+    func testChapterRepositoryStoresCatalogSnapshotWithProgressState() throws {
+        let databaseManager = try DatabaseManager.inMemory()
+        let repository = ChapterRepository(databaseManager: databaseManager)
+        let bookID = UUID()
+        let state = ChapterParseState(
+            bookID: bookID,
+            scannedUntilByteOffset: 1_024,
+            fileSize: 4_096,
+            nextSortIndex: 1,
+            updatedAt: Date(timeIntervalSince1970: 2),
+            completedAt: nil,
+            failureReason: nil
+        )
+
+        try repository.insertChapters(
+            [ReadingChapter(bookID: bookID, title: "第一章", byteOffset: 128, sortIndex: 0)],
+            state: state
+        )
+
+        let snapshot = try repository.fetchCatalogSnapshot(bookID: bookID)
+
+        XCTAssertEqual(snapshot.chapters.map(\.title), ["第一章"])
+        XCTAssertEqual(snapshot.state?.scannedUntilByteOffset, 1_024)
+        XCTAssertEqual(snapshot.state?.fileSize, 4_096)
+        XCTAssertEqual(snapshot.state?.nextSortIndex, 1)
+        XCTAssertFalse(snapshot.state?.isCompleted ?? true)
+    }
+
+    func testChapterRepositoryCanCompleteEmptyCatalog() throws {
+        let databaseManager = try DatabaseManager.inMemory()
+        let repository = ChapterRepository(databaseManager: databaseManager)
+        let bookID = UUID()
+
+        try repository.updateParsingState(
+            bookID: bookID,
+            scannedUntilByteOffset: 512,
+            fileSize: 512,
+            nextSortIndex: 0,
+            completedAt: Date(timeIntervalSince1970: 3)
+        )
+
+        let snapshot = try repository.fetchCatalogSnapshot(bookID: bookID)
+
+        XCTAssertTrue(snapshot.chapters.isEmpty)
+        XCTAssertEqual(snapshot.status, .completed)
+        XCTAssertTrue(try repository.isParsingCompleted(bookID: bookID))
+    }
 }

@@ -1,7 +1,10 @@
+import Combine
 import Foundation
 
 final class ReadingChapterService: @unchecked Sendable {
-    private static let batchSize = 96
+    private static let parseYieldDelayNanoseconds: UInt64 = 4_000_000
+
+    let chapterUpdates = PassthroughSubject<UUID, Never>()
 
     private let bookRepository: BookRepository
     private let chapterRepository: ChapterRepository
@@ -22,11 +25,8 @@ final class ReadingChapterService: @unchecked Sendable {
 
     func scheduleParsing(bookID: UUID) {
         lock.lock()
-        guard !suspendedBookIDs.contains(bookID) else {
-            lock.unlock()
-            return
-        }
-        if parsingTasks[bookID] != nil {
+        guard !suspendedBookIDs.contains(bookID),
+              parsingTasks[bookID] == nil else {
             lock.unlock()
             return
         }
@@ -35,29 +35,35 @@ final class ReadingChapterService: @unchecked Sendable {
             defer {
                 finishParsing(bookID: bookID)
             }
-
-            do {
-                guard let book = try bookRepository.fetchBook(id: bookID) else {
-                    return
-                }
-                guard try !chapterRepository.isParsingCompleted(bookID: bookID) else {
-                    return
-                }
-                try await parseChapters(for: book)
-            } catch is CancellationError {
-                return
-            } catch {
-                assertionFailure("Chapter parsing failed: \(error)")
-            }
+            await parseChapters(bookID: bookID)
         }
         parsingTasks[bookID] = task
         lock.unlock()
     }
 
-    func chapters(bookID: UUID, priority: TaskPriority = .userInitiated) async throws -> [ReadingChapter] {
-        try await Task.detached(priority: priority) { [chapterRepository] in
-            try chapterRepository.fetchChapters(bookID: bookID)
+    func catalogSnapshot(
+        bookID: UUID,
+        scheduleIfNeeded: Bool = true,
+        priority: TaskPriority = .userInitiated
+    ) async throws -> ChapterCatalogSnapshot {
+        let snapshot = try await Task.detached(priority: priority) { [chapterRepository] in
+            try chapterRepository.fetchCatalogSnapshot(bookID: bookID)
         }.value
+
+        if scheduleIfNeeded, Self.shouldScheduleParsing(for: snapshot.status) {
+            scheduleParsing(bookID: bookID)
+        }
+
+        return snapshot
+    }
+
+    func chapters(bookID: UUID, priority: TaskPriority = .userInitiated) async throws -> [ReadingChapter] {
+        let snapshot = try await catalogSnapshot(
+            bookID: bookID,
+            scheduleIfNeeded: false,
+            priority: priority
+        )
+        return snapshot.chapters
     }
 
     func cancelParsing(bookID: UUID) {
@@ -82,78 +88,142 @@ final class ReadingChapterService: @unchecked Sendable {
         scheduleParsing(bookID: bookID)
     }
 
-    private func parseChapters(for book: BookRecord) async throws {
-        try chapterRepository.deleteChapters(bookID: book.id)
-        try chapterRepository.clearParsingState(bookID: book.id)
-        var didCompleteParsing = false
-        defer {
-            if !didCompleteParsing {
-                try? chapterRepository.deleteChapters(bookID: book.id)
-                try? chapterRepository.clearParsingState(bookID: book.id)
-            }
-        }
+    private func parseChapters(bookID: UUID) async {
+        var latestScannedByteOffset: UInt64 = 0
+        var fileSize: UInt64 = 0
+        var nextSortIndex = 0
 
-        let mapping = try BookFileMapping(fileURL: book.fileURL)
-        var windowStartByteOffset: UInt64 = 0
-        var sortIndex = 0
-        var pendingChapters: [ReadingChapter] = []
-        var seenChapters: [ChapterCandidate] = []
-        var didPersistInitialBatch = false
-
-        while windowStartByteOffset < mapping.fileSize {
-            if Task.isCancelled {
+        do {
+            guard let book = try bookRepository.fetchBook(id: bookID) else {
                 return
             }
 
-            let windowEndByteOffset = min(
-                mapping.fileSize,
-                windowStartByteOffset + ChapterParser.maximumWindowLength
-            )
-            let windowData = try mapping.bytes(in: windowStartByteOffset..<windowEndByteOffset)
-            let candidates = try parser.parseCandidates(
-                in: windowData,
-                byteRange: windowStartByteOffset..<windowEndByteOffset,
-                encoding: book.encoding
-            )
+            let mapping = try BookFileMapping(fileURL: book.fileURL)
+            fileSize = mapping.fileSize
+            var snapshot = try chapterRepository.fetchCatalogSnapshot(bookID: bookID)
 
-            for candidate in candidates where !Self.hasSeen(candidate, in: seenChapters) {
-                seenChapters.append(candidate)
-                pendingChapters.append(
-                    ReadingChapter(
-                        bookID: book.id,
-                        title: candidate.title,
-                        byteOffset: candidate.byteOffset,
-                        sortIndex: sortIndex
-                    )
+            if let state = snapshot.state,
+               state.fileSize > 0,
+               state.fileSize != fileSize {
+                try chapterRepository.resetParsingData(bookID: bookID)
+                snapshot = ChapterCatalogSnapshot(chapters: [], state: nil)
+            }
+
+            if let state = snapshot.state,
+               state.isCompleted,
+               (state.fileSize == fileSize || state.fileSize == 0) {
+                return
+            }
+
+            latestScannedByteOffset = min(snapshot.state?.scannedUntilByteOffset ?? 0, fileSize)
+            nextSortIndex = max(snapshot.state?.nextSortIndex ?? 0, try chapterRepository.nextSortIndex(bookID: bookID))
+            var recentCandidates = snapshot.chapters.suffix(12).map {
+                ChapterCandidate(title: $0.title, byteOffset: $0.byteOffset)
+            }
+
+            if snapshot.state == nil {
+                try chapterRepository.updateParsingState(
+                    bookID: bookID,
+                    scannedUntilByteOffset: latestScannedByteOffset,
+                    fileSize: fileSize,
+                    nextSortIndex: nextSortIndex,
+                    completedAt: nil
                 )
-                sortIndex += 1
             }
 
-            if pendingChapters.count >= Self.batchSize
-                || (!didPersistInitialBatch && !pendingChapters.isEmpty) {
-                try chapterRepository.insertChapters(pendingChapters)
-                pendingChapters.removeAll(keepingCapacity: true)
-                didPersistInitialBatch = true
-            }
+            var windowStartByteOffset = latestScannedByteOffset > ChapterParser.overlapLength
+                ? latestScannedByteOffset - ChapterParser.overlapLength
+                : 0
 
-            guard windowEndByteOffset < mapping.fileSize else {
-                break
-            }
+            while windowStartByteOffset < fileSize {
+                try Task.checkCancellation()
 
-            let nextStart = windowEndByteOffset - min(
-                ChapterParser.overlapLength,
-                windowEndByteOffset - windowStartByteOffset
+                let windowEndByteOffset = min(
+                    fileSize,
+                    windowStartByteOffset + ChapterParser.maximumWindowLength
+                )
+                let windowData = try mapping.bytes(in: windowStartByteOffset..<windowEndByteOffset)
+                let candidates = (try? parser.parseCandidates(
+                    in: windowData,
+                    byteRange: windowStartByteOffset..<windowEndByteOffset,
+                    encoding: book.encoding,
+                    isFinalWindow: windowEndByteOffset >= fileSize
+                )) ?? []
+
+                var pendingChapters: [ReadingChapter] = []
+                pendingChapters.reserveCapacity(candidates.count)
+                for candidate in candidates
+                    where candidate.byteOffset < fileSize
+                        && !Self.hasSeen(candidate, in: recentCandidates) {
+                    pendingChapters.append(
+                        ReadingChapter(
+                            bookID: bookID,
+                            title: candidate.title,
+                            byteOffset: candidate.byteOffset,
+                            sortIndex: nextSortIndex
+                        )
+                    )
+                    nextSortIndex += 1
+                    recentCandidates.append(candidate)
+                    if recentCandidates.count > 24 {
+                        recentCandidates.removeFirst(recentCandidates.count - 24)
+                    }
+                }
+
+                latestScannedByteOffset = windowEndByteOffset
+                let didComplete = latestScannedByteOffset >= fileSize
+                let state = ChapterParseState(
+                    bookID: bookID,
+                    scannedUntilByteOffset: latestScannedByteOffset,
+                    fileSize: fileSize,
+                    nextSortIndex: nextSortIndex,
+                    updatedAt: Date(),
+                    completedAt: didComplete ? Date() : nil,
+                    failureReason: nil
+                )
+                try chapterRepository.insertChapters(pendingChapters, state: state)
+
+                if !pendingChapters.isEmpty || didComplete {
+                    chapterUpdates.send(bookID)
+                }
+
+                guard !didComplete else {
+                    break
+                }
+
+                let nextStart = windowEndByteOffset - min(
+                    ChapterParser.overlapLength,
+                    windowEndByteOffset - windowStartByteOffset
+                )
+                windowStartByteOffset = nextStart > windowStartByteOffset
+                    ? nextStart
+                    : windowEndByteOffset
+
+                // Keep parsing cooperative so catalog work does not compete with paging.
+                try await Task.sleep(nanoseconds: Self.parseYieldDelayNanoseconds)
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            try? chapterRepository.updateParsingState(
+                bookID: bookID,
+                scannedUntilByteOffset: latestScannedByteOffset,
+                fileSize: fileSize,
+                nextSortIndex: nextSortIndex,
+                completedAt: nil,
+                failureReason: String(describing: error)
             )
-            windowStartByteOffset = nextStart > windowStartByteOffset ? nextStart : windowEndByteOffset
-
-            // Keep chapter parsing cooperative without adding seconds of fixed delay
-            // on large TXT files; pause/cancel still handles active reading gestures.
-            try await Task.sleep(nanoseconds: 3_000_000)
+            chapterUpdates.send(bookID)
         }
+    }
 
-        try chapterRepository.insertChapters(pendingChapters)
-        try chapterRepository.markParsingCompleted(bookID: book.id)
-        didCompleteParsing = true
+    private static func shouldScheduleParsing(for status: ChapterParseStatus) -> Bool {
+        switch status {
+        case .notStarted, .parsing:
+            return true
+        case .completed, .failed:
+            return false
+        }
     }
 
     private static func hasSeen(_ candidate: ChapterCandidate, in candidates: [ChapterCandidate]) -> Bool {

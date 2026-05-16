@@ -169,6 +169,16 @@ extension DatabaseMigrator {
             )
         }
 
+        migrator.registerMigration("addChapterParseProgress") { database in
+            try database.alter(table: "chapterParseStates") { table in
+                table.add(column: "scannedUntilByteOffset", .integer).notNull().defaults(to: 0)
+                table.add(column: "fileSize", .integer).notNull().defaults(to: 0)
+                table.add(column: "nextSortIndex", .integer).notNull().defaults(to: 0)
+                table.add(column: "updatedAt", .double).notNull().defaults(to: 0)
+                table.add(column: "failureReason", .text)
+            }
+        }
+
         return migrator
     }
 }

@@ -1,9 +1,5 @@
 import Foundation
 
-enum ChapterParserError: Error {
-    case undecodableWindow
-}
-
 struct ChapterCandidate: Hashable, Codable, Sendable {
     let title: String
     let byteOffset: UInt64
@@ -12,79 +8,97 @@ struct ChapterCandidate: Hashable, Codable, Sendable {
 final class ChapterParser: @unchecked Sendable {
     static let maximumWindowLength: UInt64 = 256 * 1024
     static let overlapLength: UInt64 = 512
+    private static let maximumCandidateLineByteLength = 320
 
     func parseCandidates(
         in data: Data,
         byteRange: Range<UInt64>,
-        encoding: TextEncoding
+        encoding: TextEncoding,
+        isFinalWindow: Bool = true
     ) throws -> [ChapterCandidate] {
         guard !data.isEmpty else {
             return []
         }
 
-        let decodedWindow = try decodeWindow(data: data, encoding: encoding)
-        let windowStartByteOffset = byteRange.lowerBound + decodedWindow.trimmedPrefixByteCount
-        var consumedByteCount: UInt64 = 0
         var candidates: [ChapterCandidate] = []
+        var lineStart = data.startIndex
+        var currentIndex = data.startIndex
         var isFirstLine = true
 
-        // Chapter parsing walks only the bounded mmap window currently in memory.
-        decodedWindow.text.enumerateSubstrings(
-            in: decodedWindow.text.startIndex..<decodedWindow.text.endIndex,
-            options: .byLines
-        ) { substring, _, enclosingRange, _ in
-            defer {
-                isFirstLine = false
-                let consumedLine = String(decodedWindow.text[enclosingRange])
-                consumedByteCount += UInt64(Self.encodedByteCount(consumedLine, encoding: encoding))
-            }
-
-            guard !(byteRange.lowerBound > 0 && isFirstLine),
-                  let substring,
-                  let title = Self.normalizedChapterTitle(from: substring) else {
-                return
-            }
-
-            candidates.append(
-                ChapterCandidate(
-                    title: title,
-                    byteOffset: windowStartByteOffset + consumedByteCount
+        // Catalog parsing stays byte-oriented so large files do not create a full-window String.
+        while currentIndex < data.endIndex {
+            if let lineBreakLength = Self.lineBreakLength(in: data, at: currentIndex, encoding: encoding) {
+                appendCandidate(
+                    from: lineStart..<currentIndex,
+                    data: data,
+                    byteRange: byteRange,
+                    encoding: encoding,
+                    isFirstLine: isFirstLine,
+                    candidates: &candidates
                 )
+
+                currentIndex = data.index(
+                    currentIndex,
+                    offsetBy: lineBreakLength,
+                    limitedBy: data.endIndex
+                ) ?? data.endIndex
+                lineStart = currentIndex
+                isFirstLine = false
+            } else {
+                currentIndex = data.index(after: currentIndex)
+            }
+        }
+
+        if lineStart < data.endIndex,
+           isFinalWindow {
+            appendCandidate(
+                from: lineStart..<data.endIndex,
+                data: data,
+                byteRange: byteRange,
+                encoding: encoding,
+                isFirstLine: isFirstLine,
+                candidates: &candidates
             )
         }
 
         return candidates
     }
 
-    private func decodeWindow(data: Data, encoding: TextEncoding) throws -> DecodedWindow {
-        if let text = String(data: data, encoding: encoding.stringEncoding) {
-            return DecodedWindow(text: text, trimmedPrefixByteCount: 0)
+    private func appendCandidate(
+        from lineRange: Range<Data.Index>,
+        data: Data,
+        byteRange: Range<UInt64>,
+        encoding: TextEncoding,
+        isFirstLine: Bool,
+        candidates: inout [ChapterCandidate]
+    ) {
+        guard !(byteRange.lowerBound > 0 && isFirstLine),
+              !lineRange.isEmpty,
+              data.distance(from: lineRange.lowerBound, to: lineRange.upperBound)
+                <= Self.maximumCandidateLineByteLength else {
+            return
         }
 
-        let maximumTrimLength = min(4, data.count)
-        for prefixLength in 0...maximumTrimLength {
-            for suffixLength in 0...maximumTrimLength {
-                guard prefixLength + suffixLength < data.count else {
-                    continue
-                }
-
-                let lowerBound = data.startIndex + prefixLength
-                let upperBound = data.endIndex - suffixLength
-                let trimmedData = Data(data[lowerBound..<upperBound])
-                if let text = String(data: trimmedData, encoding: encoding.stringEncoding) {
-                    return DecodedWindow(
-                        text: text,
-                        trimmedPrefixByteCount: UInt64(prefixLength)
-                    )
-                }
-            }
+        let lineData = Data(data[lineRange])
+        guard let line = String(data: lineData, encoding: encoding.stringEncoding),
+              let title = Self.normalizedChapterTitle(from: line) else {
+            return
         }
 
-        throw ChapterParserError.undecodableWindow
+        let lineOffset = UInt64(data.distance(from: data.startIndex, to: lineRange.lowerBound))
+        candidates.append(
+            ChapterCandidate(
+                title: title,
+                byteOffset: byteRange.lowerBound + lineOffset
+            )
+        )
     }
 
     private static func normalizedChapterTitle(from line: String) -> String? {
-        let title = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        var title = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        if title.first == Character("\u{feff}") {
+            title.removeFirst()
+        }
         guard !title.isEmpty,
               title.count <= 80 else {
             return nil
@@ -124,14 +138,66 @@ final class ChapterParser: @unchecked Sendable {
         return title.hasPrefix("\u{5377}") || title.hasPrefix("\u{7BC7}")
     }
 
-    private static func encodedByteCount(_ text: String, encoding: TextEncoding) -> Int {
-        text.data(using: encoding.stringEncoding)?.count ?? text.utf8.count
+    private static func lineBreakLength(
+        in data: Data,
+        at index: Data.Index,
+        encoding: TextEncoding
+    ) -> Int? {
+        switch encoding {
+        case .utf16LittleEndian:
+            guard let scalar = utf16LittleEndianScalar(in: data, at: index),
+                  scalar == carriageReturn || scalar == lineFeed else {
+                return nil
+            }
+            let nextScalarIndex = data.index(index, offsetBy: 2, limitedBy: data.endIndex) ?? data.endIndex
+            let isCRLF = scalar == carriageReturn
+                && utf16LittleEndianScalar(in: data, at: nextScalarIndex) == lineFeed
+            return isCRLF ? 4 : 2
+        case .utf16BigEndian:
+            guard let scalar = utf16BigEndianScalar(in: data, at: index),
+                  scalar == carriageReturn || scalar == lineFeed else {
+                return nil
+            }
+            let nextScalarIndex = data.index(index, offsetBy: 2, limitedBy: data.endIndex) ?? data.endIndex
+            let isCRLF = scalar == carriageReturn
+                && utf16BigEndianScalar(in: data, at: nextScalarIndex) == lineFeed
+            return isCRLF ? 4 : 2
+        default:
+            let byte = data[index]
+            if byte == carriageReturn {
+                let nextIndex = data.index(after: index)
+                return nextIndex < data.endIndex && data[nextIndex] == lineFeed ? 2 : 1
+            }
+            return byte == lineFeed ? 1 : nil
+        }
     }
-}
 
-private struct DecodedWindow {
-    let text: String
-    let trimmedPrefixByteCount: UInt64
+    private static func utf16LittleEndianScalar(in data: Data, at index: Data.Index) -> UInt8? {
+        guard index < data.endIndex else {
+            return nil
+        }
+        let nextIndex = data.index(after: index)
+        guard nextIndex < data.endIndex,
+              data[nextIndex] == 0 else {
+            return nil
+        }
+        return data[index]
+    }
+
+    private static func utf16BigEndianScalar(in data: Data, at index: Data.Index) -> UInt8? {
+        guard index < data.endIndex else {
+            return nil
+        }
+        let nextIndex = data.index(after: index)
+        guard nextIndex < data.endIndex,
+              data[index] == 0 else {
+            return nil
+        }
+        return data[nextIndex]
+    }
+
+    private static let lineFeed: UInt8 = 0x0A
+    private static let carriageReturn: UInt8 = 0x0D
 }
 
 private let headingMarkers = [

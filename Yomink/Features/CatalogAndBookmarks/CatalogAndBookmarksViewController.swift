@@ -25,8 +25,9 @@ final class CatalogAndBookmarksViewController: UIViewController {
     var onBookmarkSelected: ((ReadingBookmark) -> Void)?
     var onBookmarkDeleteRequested: ((ReadingBookmark, @escaping (Bool) -> Void) -> Void)?
 
-    private let chapters: [ReadingChapter]
+    private var chapters: [ReadingChapter]
     private var bookmarks: [ReadingBookmark]
+    private var chapterStatus: ChapterParseStatus
     private let currentByteOffset: UInt64?
     private let segmentedControl = UISegmentedControl(
         items: ["\u{76EE}\u{5F55}", "\u{4E66}\u{7B7E}"]
@@ -63,9 +64,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
         return collectionView
     }()
 
-    init(chapters: [ReadingChapter], bookmarks: [ReadingBookmark], currentByteOffset: UInt64?) {
-        self.chapters = chapters
+    init(snapshot: ChapterCatalogSnapshot, bookmarks: [ReadingBookmark], currentByteOffset: UInt64?) {
+        self.chapters = snapshot.chapters
         self.bookmarks = bookmarks
+        self.chapterStatus = snapshot.status
         self.currentByteOffset = currentByteOffset
         super.init(nibName: nil, bundle: nil)
     }
@@ -86,6 +88,12 @@ final class CatalogAndBookmarksViewController: UIViewController {
         collectionView.alpha = shouldHideCollectionUntilInitialScroll ? 0 : 1
         updateSearchBarVisibility(animated: false)
         applySnapshot()
+    }
+
+    func updateCatalogSnapshot(_ snapshot: ChapterCatalogSnapshot) {
+        chapters = snapshot.chapters
+        chapterStatus = snapshot.status
+        applySnapshot(animatingDifferences: true)
     }
 
     override func viewDidLayoutSubviews() {
@@ -140,8 +148,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
     }
 
     private func configureDataSource() {
-        let currentChapterID = currentChapterIndex().map { chapters[$0].id }
-        let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Item> { cell, _, item in
+        let registration = UICollectionView.CellRegistration<UICollectionViewListCell, Item> { [weak self] cell, _, item in
             var content = UIListContentConfiguration.subtitleCell()
             cell.accessories = []
 
@@ -149,7 +156,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
             case .chapter(let chapter, let displayIndex):
                 content.text = "\(displayIndex).\(chapter.title)"
                 content.secondaryText = nil
-                let isCurrentChapter = currentChapterID.map { $0 == chapter.id } ?? false
+                let isCurrentChapter = self?.currentChapterID().map { $0 == chapter.id } ?? false
                 content.textProperties.color = isCurrentChapter ? .systemRed : YominkTheme.primaryText
                 cell.accessories = [.disclosureIndicator()]
             case .bookmark(let bookmark):
@@ -195,7 +202,7 @@ final class CatalogAndBookmarksViewController: UIViewController {
         case .chapters:
             let filteredChapters = filteredChapters()
             return filteredChapters.isEmpty
-                ? [.empty(chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{4E2D}" : "\u{672A}\u{627E}\u{5230}\u{5339}\u{914D}\u{76EE}\u{5F55}")]
+                ? [.empty(emptyChapterMessage())]
                 : filteredChapters.map { item in
                     Item.chapter(item.chapter, displayIndex: item.displayIndex)
                 }
@@ -203,6 +210,21 @@ final class CatalogAndBookmarksViewController: UIViewController {
             return bookmarks.isEmpty
                 ? [.empty("\u{6682}\u{65E0}\u{4E66}\u{7B7E}")]
                 : bookmarks.map(Item.bookmark)
+        }
+    }
+
+    private func emptyChapterMessage() -> String {
+        guard chapterSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "\u{672A}\u{627E}\u{5230}\u{5339}\u{914D}\u{76EE}\u{5F55}"
+        }
+
+        switch chapterStatus {
+        case .notStarted, .parsing:
+            return "\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{4E2D}"
+        case .completed:
+            return "\u{672A}\u{89E3}\u{6790}\u{5230}\u{76EE}\u{5F55}"
+        case .failed:
+            return "\u{76EE}\u{5F55}\u{89E3}\u{6790}\u{5931}\u{8D25}"
         }
     }
 
@@ -257,6 +279,10 @@ final class CatalogAndBookmarksViewController: UIViewController {
         return chapters.lastIndex { $0.byteOffset <= currentByteOffset }
     }
 
+    private func currentChapterID() -> UUID? {
+        currentChapterIndex().map { chapters[$0].id }
+    }
+
     private func scrollToCurrentChapterIfNeeded() {
         guard !didScrollToCurrentChapter,
               selectedSegment == .chapters,
@@ -266,9 +292,18 @@ final class CatalogAndBookmarksViewController: UIViewController {
             return
         }
         didScrollToCurrentChapter = true
+        let itemCount = collectionView.numberOfItems(inSection: 0)
+        let scrollPosition: UICollectionView.ScrollPosition
+        if currentIndex <= 1 {
+            scrollPosition = .top
+        } else if currentIndex >= max(0, itemCount - 2) {
+            scrollPosition = .bottom
+        } else {
+            scrollPosition = .centeredVertically
+        }
         collectionView.scrollToItem(
             at: IndexPath(item: currentIndex, section: 0),
-            at: .centeredVertically,
+            at: scrollPosition,
             animated: false
         )
         lastContentOffsetY = collectionView.contentOffset.y
@@ -358,7 +393,16 @@ final class CatalogAndBookmarksViewController: UIViewController {
         if let navigationController,
            navigationController.viewControllers.first !== self {
             navigationController.popViewController(animated: true)
-            completion?()
+            guard let completion else {
+                return
+            }
+            if let coordinator = navigationController.transitionCoordinator {
+                coordinator.animate(alongsideTransition: nil) { _ in
+                    completion()
+                }
+            } else {
+                DispatchQueue.main.async(execute: completion)
+            }
         } else {
             dismiss(animated: true, completion: completion)
         }

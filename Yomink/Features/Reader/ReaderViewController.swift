@@ -1,3 +1,4 @@
+import Combine
 import UIKit
 
 final class ReaderViewController: UIViewController {
@@ -36,7 +37,7 @@ final class ReaderViewController: UIViewController {
     private var previousPageTask: Task<Void, Never>?
     private var nextPageTask: Task<Void, Never>?
     private var chapterRefreshTask: Task<Void, Never>?
-    private var chapterBoundaryRefreshTask: Task<Void, Never>?
+    private var chapterUpdatesCancellable: AnyCancellable?
     private var bookmarkStateTask: Task<Void, Never>?
     private var backgroundWorkResumeTask: Task<Void, Never>?
     private var bookmarkStateByteOffset: UInt64?
@@ -53,6 +54,8 @@ final class ReaderViewController: UIViewController {
     private var activeSettings = ReadingSettings.standard
     private var preferredInterfaceStyle: UIUserInterfaceStyle = .unspecified
     private var pagingGeneration = 0
+    private weak var catalogViewController: CatalogAndBookmarksViewController?
+    private var keepsChapterParsingActiveWhileCovered = false
     private weak var previousInteractivePopGestureDelegate: UIGestureRecognizerDelegate?
     private var previousInteractivePopGestureWasEnabled = true
     private var didCaptureInteractivePopGestureState = false
@@ -150,10 +153,12 @@ final class ReaderViewController: UIViewController {
             name: UIDevice.batteryStateDidChangeNotification,
             object: nil
         )
+        subscribeToChapterUpdates()
     }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        keepsChapterParsingActiveWhileCovered = false
         navigationController?.setNavigationBarHidden(true, animated: animated)
         applyReaderPreferences()
         requestHomeIndicatorDormancy()
@@ -188,7 +193,7 @@ final class ReaderViewController: UIViewController {
         stopAutoReading()
         pendingHomeIndicatorUpdate?.cancel()
         pendingHomeIndicatorUpdate = nil
-        pauseBackgroundWork()
+        pauseBackgroundWork(keepsChapterParsingActive: keepsChapterParsingActiveWhileCovered)
         saveCurrentProgress()
         UIApplication.shared.isIdleTimerDisabled = false
         UIDevice.current.isBatteryMonitoringEnabled = false
@@ -208,7 +213,6 @@ final class ReaderViewController: UIViewController {
         previousPageTask?.cancel()
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
-        chapterBoundaryRefreshTask?.cancel()
         bookmarkStateTask?.cancel()
         backgroundWorkResumeTask?.cancel()
         chapterService.cancelParsing(bookID: book.id)
@@ -572,22 +576,24 @@ final class ReaderViewController: UIViewController {
             }
 
             do {
-                let chapters = try await chapterService.chapters(bookID: book.id)
-                self.chapters = chapters
+                let snapshot = try await chapterService.catalogSnapshot(bookID: book.id)
+                self.chapters = snapshot.chapters
                 let bookmarks = try await bookmarkService.bookmarks(bookID: book.id)
-                presentCatalogAndBookmarks(chapters: chapters, bookmarks: bookmarks)
+                presentCatalogAndBookmarks(snapshot: snapshot, bookmarks: bookmarks)
             } catch {
                 showTransientNotice(title: "\u{76EE}\u{5F55}\u{52A0}\u{8F7D}\u{5931}\u{8D25}")
             }
         }
     }
 
-    private func presentCatalogAndBookmarks(chapters: [ReadingChapter], bookmarks: [ReadingBookmark]) {
+    private func presentCatalogAndBookmarks(snapshot: ChapterCatalogSnapshot, bookmarks: [ReadingBookmark]) {
         let listViewController = CatalogAndBookmarksViewController(
-            chapters: chapters,
+            snapshot: snapshot,
             bookmarks: bookmarks,
             currentByteOffset: currentPage?.startByteOffset
         )
+        catalogViewController = listViewController
+        keepsChapterParsingActiveWhileCovered = true
         listViewController.onChapterSelected = { [weak self] chapter in
             self?.jumpToChapter(chapter)
         }
@@ -613,11 +619,11 @@ final class ReaderViewController: UIViewController {
     }
 
     private func jumpToChapter(_ chapter: ReadingChapter) {
-        jumpToByteOffset(chapter.byteOffset)
+        jumpToByteOffset(min(chapter.byteOffset, book.fileSize.saturatingLastByteOffset))
     }
 
     private func jumpToBookmark(_ bookmark: ReadingBookmark) {
-        jumpToByteOffset(bookmark.byteOffset)
+        jumpToByteOffset(min(bookmark.byteOffset, book.fileSize.saturatingLastByteOffset))
     }
 
     private func deleteBookmark(_ bookmark: ReadingBookmark, completion: @escaping (Bool) -> Void) {
@@ -641,19 +647,20 @@ final class ReaderViewController: UIViewController {
     }
 
     private func jumpToByteOffset(_ byteOffset: UInt64) {
+        let clampedByteOffset = min(byteOffset, book.fileSize.saturatingLastByteOffset)
         stopAutoReading()
         pauseBackgroundWork()
         saveCurrentProgress()
         progressStore.remember(
             ReadingProgress(
                 bookID: book.id,
-                byteOffset: byteOffset,
+                byteOffset: clampedByteOffset,
                 updatedAt: Date()
             )
         )
         progressStore.flushPendingProgress()
         pagingService.removeCachedPages()
-        openPage(preferredByteOffset: byteOffset, enforceChapterBoundary: false)
+        openPage(preferredByteOffset: clampedByteOffset, enforceChapterBoundary: false)
         scheduleBackgroundWorkResume(after: 1.5)
     }
 
@@ -1110,8 +1117,24 @@ final class ReaderViewController: UIViewController {
     }
 
     private func refreshChapters() {
+        refreshChapterCatalog(scheduleIfNeeded: false)
+    }
+
+    private func subscribeToChapterUpdates() {
+        let currentBookID = book.id
+        chapterUpdatesCancellable = chapterService.chapterUpdates
+            .filter { updatedBookID in
+                updatedBookID == currentBookID
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.refreshChapterCatalog(scheduleIfNeeded: false)
+            }
+    }
+
+    private func refreshChapterCatalog(scheduleIfNeeded: Bool) {
         chapterRefreshTask?.cancel()
-        chapterRefreshTask = Task { [weak self] in
+        chapterRefreshTask = Task { @MainActor [weak self] in
             guard let self else {
                 return
             }
@@ -1119,17 +1142,23 @@ final class ReaderViewController: UIViewController {
             var shouldReflowForChapterBoundaries = false
             var didChangeChapters = false
             do {
-                let loadedChapters = try await chapterService.chapters(bookID: book.id, priority: .utility)
+                let snapshot = try await chapterService.catalogSnapshot(
+                    bookID: book.id,
+                    scheduleIfNeeded: scheduleIfNeeded,
+                    priority: .utility
+                )
                 guard !Task.isCancelled else {
                     chapterRefreshTask = nil
                     return
                 }
+                let loadedChapters = snapshot.chapters
                 didChangeChapters = loadedChapters != chapters
                 let currentPageCrossesNewBoundary = currentPage.map {
                     pageCrossesChapterBoundary($0, in: loadedChapters)
                 } ?? false
                 shouldReflowForChapterBoundaries = currentPageCrossesNewBoundary
                 chapters = loadedChapters
+                catalogViewController?.updateCatalogSnapshot(snapshot)
             } catch {
                 chapterRefreshTask = nil
                 return
@@ -1142,35 +1171,6 @@ final class ReaderViewController: UIViewController {
             if shouldReflowForChapterBoundaries {
                 reflowCurrentPageForChapterBoundaries()
             }
-        }
-    }
-
-    private func scheduleChapterBoundaryRefresh(after delay: TimeInterval = 1.5, attempts: Int = 4) {
-        chapterBoundaryRefreshTask?.cancel()
-        chapterBoundaryRefreshTask = Task { @MainActor [weak self] in
-            guard let self else {
-                return
-            }
-            for attempt in 0..<attempts {
-                let refreshDelay = attempt == 0 ? delay : 2.0
-                do {
-                    try await Task.sleep(nanoseconds: UInt64(refreshDelay * 1_000_000_000))
-                } catch {
-                    return
-                }
-
-                guard !self.isAutoReading,
-                      !self.collectionView.isDragging,
-                      !self.collectionView.isDecelerating,
-                      !self.collectionView.isTracking else {
-                    continue
-                }
-                if self.hasResolvedChapterBoundaryForCurrentPage() {
-                    break
-                }
-                self.refreshChapters()
-            }
-            self.chapterBoundaryRefreshTask = nil
         }
     }
 
@@ -1435,14 +1435,14 @@ final class ReaderViewController: UIViewController {
         present(navigationController, animated: true)
     }
 
-    private func pauseBackgroundWork() {
+    private func pauseBackgroundWork(keepsChapterParsingActive: Bool = false) {
         backgroundWorkResumeTask?.cancel()
         backgroundWorkResumeTask = nil
         chapterRefreshTask?.cancel()
         chapterRefreshTask = nil
-        chapterBoundaryRefreshTask?.cancel()
-        chapterBoundaryRefreshTask = nil
-        chapterService.pauseParsing(bookID: book.id)
+        if !keepsChapterParsingActive {
+            chapterService.pauseParsing(bookID: book.id)
+        }
         searchIndexService.pauseIndexing(bookID: book.id)
     }
 
@@ -1469,7 +1469,6 @@ final class ReaderViewController: UIViewController {
     private func resumeBackgroundWork() {
         chapterService.resumeParsing(bookID: book.id)
         searchIndexService.resumeIndexing(bookID: book.id, startingAt: currentPage?.startByteOffset ?? 0)
-        scheduleChapterBoundaryRefresh()
     }
 
     private func refreshVisibleCellsForActiveSettings() {
@@ -1585,9 +1584,7 @@ final class ReaderViewController: UIViewController {
         previousPageTask?.cancel()
         nextPageTask?.cancel()
         chapterRefreshTask?.cancel()
-        chapterBoundaryRefreshTask?.cancel()
         chapterRefreshTask = nil
-        chapterBoundaryRefreshTask = nil
         previousPageTask = nil
         nextPageTask = nil
         pendingTapPageTurnTargetPageIndex = nil
@@ -1646,11 +1643,16 @@ final class ReaderViewController: UIViewController {
             }
 
             do {
-                let loadedChapters = try await chapterService.chapters(bookID: book.id)
+                let snapshot = try await chapterService.catalogSnapshot(
+                    bookID: book.id,
+                    scheduleIfNeeded: false
+                )
                 guard pagingGeneration == generation else {
                     return
                 }
+                let loadedChapters = snapshot.chapters
                 chapters = loadedChapters
+                catalogViewController?.updateCatalogSnapshot(snapshot)
                 updateChrome()
                 refreshVisibleStatusWidgets()
             } catch {
@@ -1695,7 +1697,6 @@ final class ReaderViewController: UIViewController {
         updateSessionState(isLoadingNextPage: false)
         chapterService.scheduleParsing(bookID: book.id)
         searchIndexService.scheduleIndexing(bookID: book.id, startingAt: page.startByteOffset)
-        scheduleChapterBoundaryRefresh(after: 0.35, attempts: 30)
     }
 
     @discardableResult
@@ -2325,5 +2326,11 @@ private struct ChapterByteRange {
         let totalByteCount = max(UInt64(1), endByteOffset - startByteOffset)
         let offset = startByteOffset + UInt64(clampedProgress * Double(totalByteCount))
         return min(endByteOffset - 1, offset)
+    }
+}
+
+private extension UInt64 {
+    var saturatingLastByteOffset: UInt64 {
+        self > 0 ? self - 1 : 0
     }
 }
