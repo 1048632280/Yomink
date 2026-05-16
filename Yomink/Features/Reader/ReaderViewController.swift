@@ -458,11 +458,12 @@ final class ReaderViewController: UIViewController {
             .bookProgress
         ]
         let hasBottomWidget = !statusBarItems.isDisjoint(with: bottomStatusItems)
+        let widgetLayout = adjustedLayout.widgetLayout
         let topWidgetInset = hasTopWidget
-            ? safeAreaInsets.top + ReaderStatusBarView.topTextExclusionHeight
+            ? widgetLayout.titleTopInset + 24
             : 0
         let bottomWidgetInset = hasBottomWidget
-            ? ReaderStatusBarView.bottomTextExclusionHeight
+            ? widgetLayout.bottomInset + 19
             : 0
         adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, safeTop)
         adjustedLayout.contentInsets.top = max(adjustedLayout.contentInsets.top, topWidgetInset)

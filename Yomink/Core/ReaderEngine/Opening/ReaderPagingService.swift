@@ -133,15 +133,7 @@ final class ReaderPagingService: @unchecked Sendable {
             request.bookID.uuidString,
             "\(request.startByteOffset)",
             "\(request.pageIndex)",
-            "\(Int(request.layout.viewportSize.width))x\(Int(request.layout.viewportSize.height))",
-            request.layout.fontName,
-            "\(request.layout.fontSize)",
-            "\(request.layout.lineSpacing)",
-            "\(request.layout.paragraphSpacing)",
-            "\(request.layout.contentInsets.top)",
-            "\(request.layout.contentInsets.left)",
-            "\(request.layout.contentInsets.bottom)",
-            "\(request.layout.contentInsets.right)",
+            Self.cacheFingerprint(for: request.layout),
             "\(request.upperBoundByteOffset ?? 0)"
         ].joined(separator: ":")
     }
@@ -152,16 +144,30 @@ final class ReaderPagingService: @unchecked Sendable {
             request.bookID.uuidString,
             "\(request.endByteOffset)",
             "\(request.pageIndex)",
-            "\(Int(request.layout.viewportSize.width))x\(Int(request.layout.viewportSize.height))",
-            request.layout.fontName,
-            "\(request.layout.fontSize)",
-            "\(request.layout.lineSpacing)",
-            "\(request.layout.paragraphSpacing)",
-            "\(request.layout.contentInsets.top)",
-            "\(request.layout.contentInsets.left)",
-            "\(request.layout.contentInsets.bottom)",
-            "\(request.layout.contentInsets.right)",
+            Self.cacheFingerprint(for: request.layout),
             "\(request.lowerBoundByteOffset ?? 0)"
+        ].joined(separator: ":")
+    }
+
+    private static func cacheFingerprint(for layout: ReadingLayout) -> String {
+        [
+            "\(Int(layout.viewportSize.width))x\(Int(layout.viewportSize.height))",
+            layout.fontName,
+            "\(layout.fontSize)",
+            "\(layout.characterSpacing)",
+            "\(layout.lineSpacing)",
+            "\(layout.paragraphSpacing)",
+            "\(layout.bodyFontWeight)",
+            "\(layout.firstLineIndent)",
+            "\(layout.chapterTitleCharacterSpacing)",
+            "\(layout.chapterTitleLineSpacing)",
+            "\(layout.chapterTitleParagraphSpacing)",
+            "\(layout.chapterTitleFontWeight)",
+            "\(layout.chapterTitleFontSizeDelta)",
+            "\(layout.contentInsets.top)",
+            "\(layout.contentInsets.left)",
+            "\(layout.contentInsets.bottom)",
+            "\(layout.contentInsets.right)"
         ].joined(separator: ":")
     }
 

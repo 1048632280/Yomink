@@ -1,9 +1,6 @@
 import UIKit
 
 final class ReaderStatusBarView: UIView {
-    static let topTextExclusionHeight: CGFloat = 34
-    static let bottomTextExclusionHeight: CGFloat = 36
-
     struct Configuration: Hashable {
         let state: ReaderSessionState
         let settings: ReadingSettings
@@ -28,6 +25,13 @@ final class ReaderStatusBarView: UIView {
     private let bottomRightStackView = UIStackView()
     private let batteryIconView = BatteryIndicatorView()
     private var currentTheme: ReadingTheme = .paper
+    private var topTitleTopConstraint: NSLayoutConstraint?
+    private var topTitleLeadingConstraint: NSLayoutConstraint?
+    private var topTitleTrailingConstraint: NSLayoutConstraint?
+    private var bottomLeftLeadingConstraint: NSLayoutConstraint?
+    private var bottomLeftBottomConstraint: NSLayoutConstraint?
+    private var bottomRightTrailingConstraint: NSLayoutConstraint?
+    private var bottomRightBottomConstraint: NSLayoutConstraint?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -61,6 +65,7 @@ final class ReaderStatusBarView: UIView {
         let chapterTitle = configuration.chapterTitle
         let chapterProgress = configuration.chapterProgress
         let visibleItems = settings.statusBarItems
+        applyWidgetLayout(settings.layout.widgetLayout)
         topLeftLabel.text = visibleItems.contains(.chapterTitle) ? chapterTitle : nil
 
         rebuildBottomLeftItems(visibleItems: visibleItems)
@@ -116,22 +121,39 @@ final class ReaderStatusBarView: UIView {
         addSubview(bottomLeftStackView)
         addSubview(bottomRightStackView)
 
-        NSLayoutConstraint.activate([
-            topLeftLabel.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor),
-            topLeftLabel.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
-            topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
+        topTitleTopConstraint = topLeftLabel.topAnchor.constraint(equalTo: topAnchor, constant: 43)
+        topTitleLeadingConstraint = topLeftLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20)
+        topTitleTrailingConstraint = topLeftLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20)
+        bottomLeftLeadingConstraint = bottomLeftStackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20)
+        bottomLeftBottomConstraint = bottomLeftStackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -27)
+        bottomRightTrailingConstraint = bottomRightStackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20)
+        bottomRightBottomConstraint = bottomRightStackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -27)
 
-            bottomLeftStackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: 20),
-            bottomLeftStackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+        let constraints: [NSLayoutConstraint?] = [
+            topTitleTopConstraint,
+            topTitleLeadingConstraint,
+            topTitleTrailingConstraint,
+            bottomLeftLeadingConstraint,
+            bottomLeftBottomConstraint,
             bottomLeftStackView.trailingAnchor.constraint(lessThanOrEqualTo: bottomRightStackView.leadingAnchor, constant: -12),
             bottomLeftStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48),
-
-            bottomRightStackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -20),
-            bottomRightStackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            bottomRightTrailingConstraint,
+            bottomRightBottomConstraint,
             bottomRightStackView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaLayoutGuide.widthAnchor, multiplier: 0.48)
-        ])
+        ]
+        NSLayoutConstraint.activate(constraints.compactMap { $0 })
 
         applyTheme(.paper)
+    }
+
+    private func applyWidgetLayout(_ layout: ReadingWidgetLayout) {
+        topTitleTopConstraint?.constant = layout.titleTopInset
+        topTitleLeadingConstraint?.constant = layout.titleLeftInset
+        topTitleTrailingConstraint?.constant = -layout.rightInset
+        bottomLeftLeadingConstraint?.constant = layout.leftInset
+        bottomLeftBottomConstraint?.constant = -layout.bottomInset
+        bottomRightTrailingConstraint?.constant = -layout.rightInset
+        bottomRightBottomConstraint?.constant = -layout.bottomInset
     }
 
     private func rebuildBottomLeftItems(visibleItems: Set<ReadingStatusBarItem>) {

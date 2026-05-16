@@ -21,12 +21,17 @@ enum ReaderTextStyler {
         foregroundColor: CGColor?
     ) -> [NSAttributedString.Key: Any] {
         var attributes: [NSAttributedString.Key: Any] = [
-            NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName(
-                layout.fontName as CFString,
-                layout.fontSize,
-                nil
+            NSAttributedString.Key(kCTFontAttributeName as String): font(
+                name: layout.fontName,
+                size: layout.fontSize,
+                weight: layout.bodyFontWeight
             ),
-            NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle(layout: layout)
+            NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle(
+                lineSpacing: layout.lineSpacing,
+                paragraphSpacing: layout.paragraphSpacing,
+                firstLineIndent: layout.firstLineIndent * layout.fontSize
+            ),
+            NSAttributedString.Key(kCTKernAttributeName as String): layout.characterSpacing
         ]
         if let foregroundColor {
             attributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = foregroundColor
@@ -44,21 +49,19 @@ enum ReaderTextStyler {
             return
         }
 
-        let titleFontSize = layout.fontSize + 1
-        let titleFont = CTFontCreateWithName(layout.fontName as CFString, titleFontSize, nil)
-        let boldTitleFont = CTFontCreateCopyWithSymbolicTraits(
-            titleFont,
-            titleFontSize,
-            nil,
-            .traitBold,
-            .traitBold
-        ) ?? titleFont
+        let titleFontSize = layout.fontSize + layout.chapterTitleFontSizeDelta
         var titleAttributes: [NSAttributedString.Key: Any] = [
-            NSAttributedString.Key(kCTFontAttributeName as String): boldTitleFont,
+            NSAttributedString.Key(kCTFontAttributeName as String): font(
+                name: layout.fontName,
+                size: titleFontSize,
+                weight: layout.chapterTitleFontWeight
+            ),
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle(
-                layout: layout,
-                paragraphSpacingMultiplier: 1.35
-            )
+                lineSpacing: layout.chapterTitleLineSpacing,
+                paragraphSpacing: layout.chapterTitleParagraphSpacing,
+                firstLineIndent: 0
+            ),
+            NSAttributedString.Key(kCTKernAttributeName as String): layout.chapterTitleCharacterSpacing
         ]
         if let foregroundColor {
             titleAttributes[NSAttributedString.Key(kCTForegroundColorAttributeName as String)] = foregroundColor
@@ -98,28 +101,51 @@ enum ReaderTextStyler {
         return ranges
     }
 
+    private static func font(name: String, size: CGFloat, weight: CGFloat) -> CTFont {
+        let baseFont = CTFontCreateWithName(name as CFString, size, nil)
+        guard weight > 0 else {
+            return baseFont
+        }
+        return CTFontCreateCopyWithSymbolicTraits(
+            baseFont,
+            size,
+            nil,
+            .traitBold,
+            .traitBold
+        ) ?? baseFont
+    }
+
     private static func paragraphStyle(
-        layout: ReadingLayout,
-        paragraphSpacingMultiplier: CGFloat = 1
+        lineSpacing: CGFloat,
+        paragraphSpacing: CGFloat,
+        firstLineIndent: CGFloat
     ) -> CTParagraphStyle {
-        var lineSpacing = layout.lineSpacing
-        var paragraphSpacing = layout.paragraphSpacing * paragraphSpacingMultiplier
-        return withUnsafePointer(to: &lineSpacing) { lineSpacingPointer in
-            withUnsafePointer(to: &paragraphSpacing) { paragraphSpacingPointer in
-                let settings = [
-                    CTParagraphStyleSetting(
-                        spec: .lineSpacingAdjustment,
-                        valueSize: MemoryLayout<CGFloat>.size,
-                        value: UnsafeRawPointer(lineSpacingPointer)
-                    ),
-                    CTParagraphStyleSetting(
-                        spec: .paragraphSpacing,
-                        valueSize: MemoryLayout<CGFloat>.size,
-                        value: UnsafeRawPointer(paragraphSpacingPointer)
-                    )
-                ]
-                return settings.withUnsafeBufferPointer { buffer in
-                    CTParagraphStyleCreate(buffer.baseAddress, buffer.count)
+        var resolvedLineSpacing = lineSpacing
+        var resolvedParagraphSpacing = paragraphSpacing
+        var resolvedFirstLineIndent = firstLineIndent
+        return withUnsafePointer(to: &resolvedLineSpacing) { lineSpacingPointer in
+            withUnsafePointer(to: &resolvedParagraphSpacing) { paragraphSpacingPointer in
+                withUnsafePointer(to: &resolvedFirstLineIndent) { firstLineIndentPointer in
+                    let settings = [
+                        CTParagraphStyleSetting(
+                            spec: .lineSpacingAdjustment,
+                            valueSize: MemoryLayout<CGFloat>.size,
+                            value: UnsafeRawPointer(lineSpacingPointer)
+                        ),
+                        CTParagraphStyleSetting(
+                            spec: .paragraphSpacing,
+                            valueSize: MemoryLayout<CGFloat>.size,
+                            value: UnsafeRawPointer(paragraphSpacingPointer)
+                        ),
+                        CTParagraphStyleSetting(
+                            spec: .firstLineHeadIndent,
+                            valueSize: MemoryLayout<CGFloat>.size,
+                            value: UnsafeRawPointer(firstLineIndentPointer)
+                        )
+                    ]
+                    return settings.withUnsafeBufferPointer { buffer in
+                        CTParagraphStyleCreate(buffer.baseAddress, buffer.count)
+                    }
                 }
             }
         }

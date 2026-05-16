@@ -11,10 +11,25 @@ final class ReaderSettingsViewController: UIViewController {
 
     private enum NumericField: Hashable {
         case fontSize
+        case characterSpacing
         case lineSpacing
         case paragraphSpacing
-        case horizontalInset
-        case verticalInset
+        case topInset
+        case bottomInset
+        case leftInset
+        case rightInset
+        case bodyFontWeight
+        case firstLineIndent
+        case titleCharacterSpacing
+        case titleLineSpacing
+        case titleParagraphSpacing
+        case titleFontWeight
+        case titleFontSizeDelta
+        case widgetLeftInset
+        case widgetRightInset
+        case widgetBottomInset
+        case widgetTitleTopInset
+        case widgetTitleLeftInset
     }
 
     private var pendingSettings: ReadingSettings
@@ -176,6 +191,12 @@ final class ReaderSettingsViewController: UIViewController {
                 title: "\u{6392}\u{7248}\u{5BC6}\u{5EA6}",
                 control: layoutDensityControl
             ))
+            detailStack.addArrangedSubview(makeSectionLabel("\u{6B63}\u{6587}"))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5B57}\u{95F4}\u{8DDD}",
+                field: .characterSpacing,
+                range: ReadingSettings.characterSpacingRange
+            ))
             detailStack.addArrangedSubview(makeNumericRow(
                 title: "\u{884C}\u{8DDD}",
                 field: .lineSpacing,
@@ -187,14 +208,86 @@ final class ReaderSettingsViewController: UIViewController {
                 range: ReadingSettings.paragraphSpacingRange
             ))
             detailStack.addArrangedSubview(makeNumericRow(
-                title: "\u{5DE6}\u{53F3}\u{8FB9}\u{8DDD}",
-                field: .horizontalInset,
+                title: "\u{4E0A}\u{8FB9}\u{8DDD}",
+                field: .topInset,
+                range: ReadingSettings.verticalInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{4E0B}\u{8FB9}\u{8DDD}",
+                field: .bottomInset,
+                range: ReadingSettings.verticalInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5DE6}\u{8FB9}\u{8DDD}",
+                field: .leftInset,
                 range: ReadingSettings.horizontalInsetRange
             ))
             detailStack.addArrangedSubview(makeNumericRow(
-                title: "\u{4E0A}\u{4E0B}\u{8FB9}\u{8DDD}",
-                field: .verticalInset,
-                range: ReadingSettings.verticalInsetRange
+                title: "\u{53F3}\u{8FB9}\u{8DDD}",
+                field: .rightInset,
+                range: ReadingSettings.horizontalInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5B57}\u{4F53}\u{7C97}\u{7EC6}",
+                field: .bodyFontWeight,
+                range: ReadingSettings.fontWeightRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{9996}\u{884C}\u{7F29}\u{8FDB}",
+                field: .firstLineIndent,
+                range: ReadingSettings.firstLineIndentRange
+            ))
+            detailStack.addArrangedSubview(makeSectionLabel("\u{7AE0}\u{8282}\u{6807}\u{9898}"))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5B57}\u{95F4}\u{8DDD}",
+                field: .titleCharacterSpacing,
+                range: ReadingSettings.characterSpacingRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{884C}\u{8DDD}",
+                field: .titleLineSpacing,
+                range: ReadingSettings.lineSpacingRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{6BB5}\u{8DDD}",
+                field: .titleParagraphSpacing,
+                range: ReadingSettings.paragraphSpacingRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5B57}\u{4F53}\u{7C97}\u{7EC6}",
+                field: .titleFontWeight,
+                range: ReadingSettings.fontWeightRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5B57}\u{53F7}\u{589E}\u{91CF}",
+                field: .titleFontSizeDelta,
+                range: ReadingSettings.titleFontSizeDeltaRange
+            ))
+            detailStack.addArrangedSubview(makeSectionLabel("\u{5C0F}\u{90E8}\u{4EF6}"))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{5DE6}\u{8FB9}\u{8DDD}",
+                field: .widgetLeftInset,
+                range: ReadingSettings.widgetHorizontalInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{53F3}\u{8FB9}\u{8DDD}",
+                field: .widgetRightInset,
+                range: ReadingSettings.widgetHorizontalInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{4E0B}\u{8FB9}\u{8DDD}",
+                field: .widgetBottomInset,
+                range: ReadingSettings.widgetBottomInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{6807}\u{9898}\u{4E0A}\u{8FB9}\u{8DDD}",
+                field: .widgetTitleTopInset,
+                range: ReadingSettings.widgetTitleTopInsetRange
+            ))
+            detailStack.addArrangedSubview(makeNumericRow(
+                title: "\u{6807}\u{9898}\u{5DE6}\u{8FB9}\u{8DDD}",
+                field: .widgetTitleLeftInset,
+                range: ReadingSettings.widgetHorizontalInsetRange
             ))
         case .more:
             detailStack.addArrangedSubview(makeSwitchRow(
@@ -299,7 +392,7 @@ final class ReaderSettingsViewController: UIViewController {
     private func makeValueField(for field: NumericField) -> UITextField {
         let textField = UITextField()
         textField.borderStyle = .roundedRect
-        textField.keyboardType = .numberPad
+        textField.keyboardType = .decimalPad
         textField.textAlignment = .center
         textField.font = .preferredFont(forTextStyle: .body)
         textField.adjustsFontForContentSizeCategory = true
@@ -380,14 +473,44 @@ final class ReaderSettingsViewController: UIViewController {
         switch field {
         case .fontSize:
             return pendingSettings.layout.fontSize
+        case .characterSpacing:
+            return pendingSettings.layout.characterSpacing
         case .lineSpacing:
             return pendingSettings.layout.lineSpacing
         case .paragraphSpacing:
             return pendingSettings.layout.paragraphSpacing
-        case .horizontalInset:
-            return pendingSettings.layout.contentInsets.left
-        case .verticalInset:
+        case .topInset:
             return pendingSettings.layout.contentInsets.top
+        case .bottomInset:
+            return pendingSettings.layout.contentInsets.bottom
+        case .leftInset:
+            return pendingSettings.layout.contentInsets.left
+        case .rightInset:
+            return pendingSettings.layout.contentInsets.right
+        case .bodyFontWeight:
+            return pendingSettings.layout.bodyFontWeight
+        case .firstLineIndent:
+            return pendingSettings.layout.firstLineIndent
+        case .titleCharacterSpacing:
+            return pendingSettings.layout.chapterTitleCharacterSpacing
+        case .titleLineSpacing:
+            return pendingSettings.layout.chapterTitleLineSpacing
+        case .titleParagraphSpacing:
+            return pendingSettings.layout.chapterTitleParagraphSpacing
+        case .titleFontWeight:
+            return pendingSettings.layout.chapterTitleFontWeight
+        case .titleFontSizeDelta:
+            return pendingSettings.layout.chapterTitleFontSizeDelta
+        case .widgetLeftInset:
+            return pendingSettings.layout.widgetLayout.leftInset
+        case .widgetRightInset:
+            return pendingSettings.layout.widgetLayout.rightInset
+        case .widgetBottomInset:
+            return pendingSettings.layout.widgetLayout.bottomInset
+        case .widgetTitleTopInset:
+            return pendingSettings.layout.widgetLayout.titleTopInset
+        case .widgetTitleLeftInset:
+            return pendingSettings.layout.widgetLayout.titleLeftInset
         }
     }
 
@@ -395,19 +518,62 @@ final class ReaderSettingsViewController: UIViewController {
         switch field {
         case .fontSize:
             pendingSettings.layout.fontSize = value
+        case .characterSpacing:
+            pendingSettings.layout.characterSpacing = value
+            pendingSettings.layoutDensity = .custom
         case .lineSpacing:
             pendingSettings.layout.lineSpacing = value
             pendingSettings.layoutDensity = .custom
         case .paragraphSpacing:
             pendingSettings.layout.paragraphSpacing = value
             pendingSettings.layoutDensity = .custom
-        case .horizontalInset:
+        case .topInset:
+            pendingSettings.layout.contentInsets.top = value
+            pendingSettings.layoutDensity = .custom
+        case .bottomInset:
+            pendingSettings.layout.contentInsets.bottom = value
+            pendingSettings.layoutDensity = .custom
+        case .leftInset:
             pendingSettings.layout.contentInsets.left = value
+            pendingSettings.layoutDensity = .custom
+        case .rightInset:
             pendingSettings.layout.contentInsets.right = value
             pendingSettings.layoutDensity = .custom
-        case .verticalInset:
-            pendingSettings.layout.contentInsets.top = value
-            pendingSettings.layout.contentInsets.bottom = value
+        case .bodyFontWeight:
+            pendingSettings.layout.bodyFontWeight = value
+            pendingSettings.layoutDensity = .custom
+        case .firstLineIndent:
+            pendingSettings.layout.firstLineIndent = value
+            pendingSettings.layoutDensity = .custom
+        case .titleCharacterSpacing:
+            pendingSettings.layout.chapterTitleCharacterSpacing = value
+            pendingSettings.layoutDensity = .custom
+        case .titleLineSpacing:
+            pendingSettings.layout.chapterTitleLineSpacing = value
+            pendingSettings.layoutDensity = .custom
+        case .titleParagraphSpacing:
+            pendingSettings.layout.chapterTitleParagraphSpacing = value
+            pendingSettings.layoutDensity = .custom
+        case .titleFontWeight:
+            pendingSettings.layout.chapterTitleFontWeight = value
+            pendingSettings.layoutDensity = .custom
+        case .titleFontSizeDelta:
+            pendingSettings.layout.chapterTitleFontSizeDelta = value
+            pendingSettings.layoutDensity = .custom
+        case .widgetLeftInset:
+            pendingSettings.layout.widgetLayout.leftInset = value
+            pendingSettings.layoutDensity = .custom
+        case .widgetRightInset:
+            pendingSettings.layout.widgetLayout.rightInset = value
+            pendingSettings.layoutDensity = .custom
+        case .widgetBottomInset:
+            pendingSettings.layout.widgetLayout.bottomInset = value
+            pendingSettings.layoutDensity = .custom
+        case .widgetTitleTopInset:
+            pendingSettings.layout.widgetLayout.titleTopInset = value
+            pendingSettings.layoutDensity = .custom
+        case .widgetTitleLeftInset:
+            pendingSettings.layout.widgetLayout.titleLeftInset = value
             pendingSettings.layoutDensity = .custom
         }
         pendingSettings = pendingSettings.normalized()
@@ -418,7 +584,9 @@ final class ReaderSettingsViewController: UIViewController {
         delta: CGFloat,
         range: ClosedRange<Double>
     ) {
-        let updatedValue = clamped(Double(value(for: field) + delta), in: range)
+        let step = stepValue(for: field)
+        let direction = delta < 0 ? -step : step
+        let updatedValue = clamped(Double(value(for: field) + direction), in: range)
         setValue(CGFloat(updatedValue), for: field)
         refreshControlValues()
     }
@@ -442,14 +610,34 @@ final class ReaderSettingsViewController: UIViewController {
         switch field {
         case .fontSize:
             return ReadingSettings.fontSizeRange
+        case .characterSpacing:
+            return ReadingSettings.characterSpacingRange
         case .lineSpacing:
             return ReadingSettings.lineSpacingRange
         case .paragraphSpacing:
             return ReadingSettings.paragraphSpacingRange
-        case .horizontalInset:
-            return ReadingSettings.horizontalInsetRange
-        case .verticalInset:
+        case .topInset, .bottomInset:
             return ReadingSettings.verticalInsetRange
+        case .leftInset, .rightInset:
+            return ReadingSettings.horizontalInsetRange
+        case .bodyFontWeight, .titleFontWeight:
+            return ReadingSettings.fontWeightRange
+        case .firstLineIndent:
+            return ReadingSettings.firstLineIndentRange
+        case .titleCharacterSpacing:
+            return ReadingSettings.characterSpacingRange
+        case .titleLineSpacing:
+            return ReadingSettings.lineSpacingRange
+        case .titleParagraphSpacing:
+            return ReadingSettings.paragraphSpacingRange
+        case .titleFontSizeDelta:
+            return ReadingSettings.titleFontSizeDeltaRange
+        case .widgetLeftInset, .widgetRightInset, .widgetTitleLeftInset:
+            return ReadingSettings.widgetHorizontalInsetRange
+        case .widgetBottomInset:
+            return ReadingSettings.widgetBottomInsetRange
+        case .widgetTitleTopInset:
+            return ReadingSettings.widgetTitleTopInsetRange
         }
     }
 
@@ -458,7 +646,21 @@ final class ReaderSettingsViewController: UIViewController {
     }
 
     private func formattedValue(_ value: CGFloat) -> String {
-        String(Int(value.rounded()))
+        let roundedValue = (Double(value) * 10).rounded() / 10
+        if roundedValue.rounded() == roundedValue {
+            return String(Int(roundedValue))
+        }
+        return String(format: "%.1f", roundedValue)
+    }
+
+    private func stepValue(for field: NumericField) -> CGFloat {
+        switch field {
+        case .characterSpacing,
+             .titleCharacterSpacing:
+            return 0.1
+        default:
+            return 1
+        }
     }
 
     private func applyDensity(_ density: ReadingLayoutDensity) {
@@ -468,21 +670,21 @@ final class ReaderSettingsViewController: UIViewController {
 
         switch density {
         case .compact:
-            pendingSettings.layout.lineSpacing = 4
-            pendingSettings.layout.paragraphSpacing = 6
-            pendingSettings.layout.contentInsets = CodableEdgeInsets(top: 22, left: 18, bottom: 22, right: 18)
+            applyPresetLayout(.compactPhone)
         case .standard:
-            pendingSettings.layout.lineSpacing = ReadingLayout.defaultPhone.lineSpacing
-            pendingSettings.layout.paragraphSpacing = ReadingLayout.defaultPhone.paragraphSpacing
-            pendingSettings.layout.contentInsets = ReadingLayout.defaultPhone.contentInsets
+            applyPresetLayout(.defaultPhone)
         case .loose:
-            pendingSettings.layout.lineSpacing = 10
-            pendingSettings.layout.paragraphSpacing = 16
-            pendingSettings.layout.contentInsets = CodableEdgeInsets(top: 36, left: 32, bottom: 36, right: 32)
+            applyPresetLayout(.loosePhone)
         case .custom:
             break
         }
         pendingSettings = pendingSettings.normalized()
+    }
+
+    private func applyPresetLayout(_ layout: ReadingLayout) {
+        let fontSize = pendingSettings.layout.fontSize
+        pendingSettings.layout = layout
+        pendingSettings.layout.fontSize = fontSize
     }
 
     private func updateStatusBarItem(_ item: ReadingStatusBarItem, isEnabled: Bool) {

@@ -86,10 +86,17 @@ enum ReadingStatusBarItem: String, Codable, CaseIterable, Hashable, Sendable {
 
 struct ReadingSettings: Hashable, Codable, Sendable {
     static let fontSizeRange: ClosedRange<Double> = 14...30
-    static let lineSpacingRange: ClosedRange<Double> = 2...14
-    static let paragraphSpacingRange: ClosedRange<Double> = 4...18
-    static let horizontalInsetRange: ClosedRange<Double> = 12...48
-    static let verticalInsetRange: ClosedRange<Double> = 16...56
+    static let characterSpacingRange: ClosedRange<Double> = 0...4
+    static let lineSpacingRange: ClosedRange<Double> = 2...18
+    static let paragraphSpacingRange: ClosedRange<Double> = 4...24
+    static let horizontalInsetRange: ClosedRange<Double> = 12...56
+    static let verticalInsetRange: ClosedRange<Double> = 20...96
+    static let fontWeightRange: ClosedRange<Double> = 0...5
+    static let firstLineIndentRange: ClosedRange<Double> = 0...4
+    static let titleFontSizeDeltaRange: ClosedRange<Double> = 0...4
+    static let widgetHorizontalInsetRange: ClosedRange<Double> = 12...56
+    static let widgetBottomInsetRange: ClosedRange<Double> = 0...48
+    static let widgetTitleTopInsetRange: ClosedRange<Double> = 24...72
 
     var layout: ReadingLayout
     var theme: ReadingTheme
@@ -166,14 +173,44 @@ struct ReadingSettings: Hashable, Codable, Sendable {
 
     func normalized(viewportSize: CGSize? = nil) -> ReadingSettings {
         var settings = self
+        settings.applyPresetLayoutIfNeeded()
         if let viewportSize {
             settings.layout.viewportSize = viewportSize
         }
         settings.layout.fontSize = Self.clamp(settings.layout.fontSize, in: Self.fontSizeRange)
+        settings.layout.characterSpacing = Self.clamp(
+            settings.layout.characterSpacing,
+            in: Self.characterSpacingRange
+        )
         settings.layout.lineSpacing = Self.clamp(settings.layout.lineSpacing, in: Self.lineSpacingRange)
         settings.layout.paragraphSpacing = Self.clamp(
             settings.layout.paragraphSpacing,
             in: Self.paragraphSpacingRange
+        )
+        settings.layout.bodyFontWeight = Self.clamp(settings.layout.bodyFontWeight, in: Self.fontWeightRange)
+        settings.layout.firstLineIndent = Self.clamp(
+            settings.layout.firstLineIndent,
+            in: Self.firstLineIndentRange
+        )
+        settings.layout.chapterTitleCharacterSpacing = Self.clamp(
+            settings.layout.chapterTitleCharacterSpacing,
+            in: Self.characterSpacingRange
+        )
+        settings.layout.chapterTitleLineSpacing = Self.clamp(
+            settings.layout.chapterTitleLineSpacing,
+            in: Self.lineSpacingRange
+        )
+        settings.layout.chapterTitleParagraphSpacing = Self.clamp(
+            settings.layout.chapterTitleParagraphSpacing,
+            in: Self.paragraphSpacingRange
+        )
+        settings.layout.chapterTitleFontWeight = Self.clamp(
+            settings.layout.chapterTitleFontWeight,
+            in: Self.fontWeightRange
+        )
+        settings.layout.chapterTitleFontSizeDelta = Self.clamp(
+            settings.layout.chapterTitleFontSizeDelta,
+            in: Self.titleFontSizeDeltaRange
         )
         settings.layout.contentInsets.left = Self.clamp(
             settings.layout.contentInsets.left,
@@ -191,11 +228,48 @@ struct ReadingSettings: Hashable, Codable, Sendable {
             settings.layout.contentInsets.bottom,
             in: Self.verticalInsetRange
         )
+        settings.layout.widgetLayout.leftInset = Self.clamp(
+            settings.layout.widgetLayout.leftInset,
+            in: Self.widgetHorizontalInsetRange
+        )
+        settings.layout.widgetLayout.rightInset = Self.clamp(
+            settings.layout.widgetLayout.rightInset,
+            in: Self.widgetHorizontalInsetRange
+        )
+        settings.layout.widgetLayout.bottomInset = Self.clamp(
+            settings.layout.widgetLayout.bottomInset,
+            in: Self.widgetBottomInsetRange
+        )
+        settings.layout.widgetLayout.titleTopInset = Self.clamp(
+            settings.layout.widgetLayout.titleTopInset,
+            in: Self.widgetTitleTopInsetRange
+        )
+        settings.layout.widgetLayout.titleLeftInset = Self.clamp(
+            settings.layout.widgetLayout.titleLeftInset,
+            in: Self.widgetHorizontalInsetRange
+        )
         return settings
     }
 
     private static func clamp(_ value: CGFloat, in range: ClosedRange<Double>) -> CGFloat {
         CGFloat(min(range.upperBound, max(range.lowerBound, Double(value))))
+    }
+}
+
+private extension ReadingSettings {
+    mutating func applyPresetLayoutIfNeeded() {
+        let fontSize = layout.fontSize
+        switch layoutDensity {
+        case .compact:
+            layout = .compactPhone
+        case .standard:
+            layout = .defaultPhone
+        case .loose:
+            layout = .loosePhone
+        case .custom:
+            return
+        }
+        layout.fontSize = fontSize
     }
 }
 
