@@ -1,7 +1,7 @@
 import UIKit
 
 final class ReaderSettingsViewController: UIViewController {
-    var onApply: ((ReadingSettings) -> Void)?
+    var onChange: ((ReadingSettings) -> Void)?
 
     private enum DetailMode: Int {
         case pageTurn
@@ -71,25 +71,10 @@ final class ReaderSettingsViewController: UIViewController {
         super.viewDidLoad()
         view.backgroundColor = YominkTheme.background
         title = "\u{9605}\u{8BFB}\u{8BBE}\u{7F6E}"
-        configureNavigationItems()
         configureControls()
         configureLayout()
         refreshControlValues()
         rebuildDetailLayer()
-    }
-
-    private func configureNavigationItems() {
-        navigationItem.leftBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .cancel,
-            target: self,
-            action: #selector(cancel)
-        )
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "\u{5E94}\u{7528}",
-            style: .done,
-            target: self,
-            action: #selector(apply)
-        )
     }
 
     private func configureControls() {
@@ -105,6 +90,7 @@ final class ReaderSettingsViewController: UIViewController {
                     return
                 }
                 pendingSettings.keepScreenAwake = keepAwakeSwitch.isOn
+                emitChange()
             },
             for: .valueChanged
         )
@@ -114,6 +100,7 @@ final class ReaderSettingsViewController: UIViewController {
                     return
                 }
                 pendingSettings.autoHideHomeIndicator = homeIndicatorSwitch.isOn
+                emitChange()
             },
             for: .valueChanged
         )
@@ -123,6 +110,7 @@ final class ReaderSettingsViewController: UIViewController {
                     return
                 }
                 pendingSettings.hideSystemStatusBar = systemStatusBarSwitch.isOn
+                emitChange()
             },
             for: .valueChanged
         )
@@ -132,6 +120,7 @@ final class ReaderSettingsViewController: UIViewController {
                     return
                 }
                 pendingSettings.allowsSwipeBack = swipeBackSwitch.isOn
+                emitChange()
             },
             for: .valueChanged
         )
@@ -416,6 +405,15 @@ final class ReaderSettingsViewController: UIViewController {
                 guard let self, let textField else {
                     return
                 }
+                updateTextFieldLive(textField)
+            },
+            for: .editingChanged
+        )
+        textField.addAction(
+            UIAction { [weak self, weak textField] _ in
+                guard let self, let textField else {
+                    return
+                }
                 commitTextField(textField)
             },
             for: .editingDidEnd
@@ -604,6 +602,7 @@ final class ReaderSettingsViewController: UIViewController {
         let updatedValue = clamped(Double(value(for: field) + direction), in: range)
         setValue(CGFloat(updatedValue), for: field)
         refreshControlValues()
+        emitChange()
     }
 
     private func commitTextField(_ textField: UITextField) {
@@ -619,6 +618,18 @@ final class ReaderSettingsViewController: UIViewController {
 
         setValue(CGFloat(clamped(value, in: range(for: field))), for: field)
         refreshControlValues()
+        emitChange()
+    }
+
+    private func updateTextFieldLive(_ textField: UITextField) {
+        guard let field = numericFields.first(where: { $0.value === textField })?.key,
+              let text = textField.text,
+              let value = Double(text) else {
+            return
+        }
+
+        setValue(CGFloat(clamped(value, in: range(for: field))), for: field)
+        emitChange()
     }
 
     private func range(for field: NumericField) -> ClosedRange<Double> {
@@ -708,11 +719,13 @@ final class ReaderSettingsViewController: UIViewController {
         } else {
             pendingSettings.statusBarItems.remove(item)
         }
+        emitChange()
     }
 
     @objc private func themeChanged() {
         let index = max(0, themeControl.selectedSegmentIndex)
         pendingSettings.theme = ReadingTheme.allCases[index]
+        emitChange()
     }
 
     @objc private func detailModeChanged() {
@@ -722,6 +735,7 @@ final class ReaderSettingsViewController: UIViewController {
     @objc private func pageTurnChanged() {
         let index = max(0, pageTurnControl.selectedSegmentIndex)
         pendingSettings.pageTurnMode = ReadingPageTurnMode.allCases[index]
+        emitChange()
     }
 
     @objc private func layoutDensityChanged() {
@@ -730,16 +744,12 @@ final class ReaderSettingsViewController: UIViewController {
         pendingSettings.layoutDensity = density
         applyDensity(density)
         refreshControlValues()
+        emitChange()
     }
 
-    @objc private func cancel() {
-        dismiss(animated: true)
-    }
-
-    @objc private func apply() {
-        view.endEditing(true)
-        onApply?(pendingSettings.normalized())
-        dismiss(animated: true)
+    private func emitChange() {
+        pendingSettings = pendingSettings.normalized()
+        onChange?(pendingSettings)
     }
 }
 

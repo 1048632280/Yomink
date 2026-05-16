@@ -59,7 +59,7 @@ final class AutoReadSpeedPanelView: UIView {
         valueLabel.textAlignment = .right
 
         speedSlider.minimumValue = 12
-        speedSlider.maximumValue = 96
+        speedSlider.maximumValue = 360
         speedSlider.isContinuous = true
         speedSlider.addTarget(self, action: #selector(speedChanged), for: .valueChanged)
 

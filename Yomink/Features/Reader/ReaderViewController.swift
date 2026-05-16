@@ -1,4 +1,5 @@
 import Combine
+import QuartzCore
 import UIKit
 
 final class ReaderViewController: UIViewController {
@@ -25,6 +26,7 @@ final class ReaderViewController: UIViewController {
     private let collectionView: UICollectionView
     private let chromeView = ReaderChromeView()
     private let autoReadPanelView = AutoReadSpeedPanelView()
+    private let autoReadStatusBarView = ReaderStatusBarView()
     private var moreMenuView: UIView?
 
     private var dataSource: UICollectionViewDiffableDataSource<Section, ReaderPage>?
@@ -50,7 +52,8 @@ final class ReaderViewController: UIViewController {
     private var isAutoReading = false
     private var isAutoReadPanelVisible = false
     private var autoReadSpeed: CGFloat = 36
-    private var autoReadTickTask: Task<Void, Never>?
+    private var autoReadDisplayLink: CADisplayLink?
+    private var lastAutoReadFrameTimestamp: CFTimeInterval?
     private var activeSettings = ReadingSettings.standard
     private var preferredInterfaceStyle: UIUserInterfaceStyle = .unspecified
     private var pagingGeneration = 0
@@ -71,6 +74,20 @@ final class ReaderViewController: UIViewController {
         var settings = activeSettings
         settings.layout = effectiveReadingLayout(from: activeSettings)
         return settings
+    }
+
+    private func renderingSettingsForVisibleCells() -> ReadingSettings {
+        var settings = pageRenderingSettings
+        guard isAutoReading else {
+            return settings
+        }
+        settings.layout.contentInsets.top = 0
+        settings.layout.contentInsets.bottom = 0
+        return settings
+    }
+
+    private func inlineStatusConfiguration(for page: ReaderPage) -> ReaderStatusBarView.Configuration? {
+        isAutoReading ? nil : statusConfiguration(for: page)
     }
 
     init(
@@ -120,7 +137,9 @@ final class ReaderViewController: UIViewController {
     }
 
     override var prefersStatusBarHidden: Bool {
-        activeSettings.hideSystemStatusBar && !isChromeVisible && !isAutoReadPanelVisible
+        activeSettings.hideSystemStatusBar
+            && !isChromeVisible
+            && (!isAutoReadPanelVisible || isAutoReading)
     }
 
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
@@ -133,6 +152,7 @@ final class ReaderViewController: UIViewController {
         applyTheme(activeSettings.theme)
         configureCollectionView()
         configureDataSource()
+        configureAutoReadStatusBar()
         configureAutoReadPanel()
         configureChrome()
         configureGestures()
@@ -205,7 +225,7 @@ final class ReaderViewController: UIViewController {
     }
 
     deinit {
-        autoReadTickTask?.cancel()
+        invalidateAutoReadDisplayLink()
         Task { @MainActor in
             UIApplication.shared.isIdleTimerDisabled = false
             UIDevice.current.isBatteryMonitoringEnabled = false
@@ -254,12 +274,24 @@ final class ReaderViewController: UIViewController {
             }
             cell.configure(
                 page: page,
-                settings: pageRenderingSettings,
+                settings: renderingSettingsForVisibleCells(),
                 filterRules: contentFilterRules,
-                statusConfiguration: statusConfiguration(for: page)
+                statusConfiguration: inlineStatusConfiguration(for: page)
             )
             return cell
         }
+    }
+
+    private func configureAutoReadStatusBar() {
+        autoReadStatusBarView.translatesAutoresizingMaskIntoConstraints = false
+        autoReadStatusBarView.isHidden = true
+        view.addSubview(autoReadStatusBarView)
+        NSLayoutConstraint.activate([
+            autoReadStatusBarView.topAnchor.constraint(equalTo: view.topAnchor),
+            autoReadStatusBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            autoReadStatusBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            autoReadStatusBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
     }
 
     private func configureAutoReadPanel() {
@@ -314,6 +346,7 @@ final class ReaderViewController: UIViewController {
         view.backgroundColor = palette.background
         collectionView.backgroundColor = palette.background
         autoReadPanelView.configure(speed: autoReadSpeed, theme: theme)
+        autoReadStatusBarView.applyTheme(theme)
         configureChromeView()
     }
 
@@ -325,7 +358,7 @@ final class ReaderViewController: UIViewController {
         settings.layout.viewportSize = collectionView.bounds.size
 
         let settingsViewController = ReaderSettingsViewController(settings: settings)
-        settingsViewController.onApply = { [weak self] newSettings in
+        settingsViewController.onChange = { [weak self] newSettings in
             self?.applyReadingSettings(newSettings)
         }
 
@@ -755,25 +788,29 @@ final class ReaderViewController: UIViewController {
         pauseBackgroundWork()
         setChromeVisible(false, animated: true)
         isAutoReading = true
+        autoReadStatusBarView.isHidden = false
+        updateAutoReadStatusBar()
         setAutoReadPanelVisible(true, animated: true)
         configureCollectionViewForAutoReading()
+        refreshVisibleCellsForActiveSettings()
         alignContentOffsetToCurrentPage()
         requestHomeIndicatorDormancy(after: 0.35)
-        scheduleAutoReadTick()
+        startAutoReadDisplayLink()
     }
 
     private func stopAutoReading() {
-        guard isAutoReading || autoReadTickTask != nil else {
+        guard isAutoReading || autoReadDisplayLink != nil else {
             return
         }
 
-        autoReadTickTask?.cancel()
-        autoReadTickTask = nil
+        invalidateAutoReadDisplayLink()
         collectionView.layer.removeAllAnimations()
         updateCurrentPageFromVisiblePage()
         isAutoReading = false
+        autoReadStatusBarView.isHidden = true
         setAutoReadPanelVisible(false, animated: true)
         configureCollectionViewForActiveSettings()
+        refreshVisibleCellsForActiveSettings()
         alignContentOffsetToCurrentPage()
         updateCurrentPageFromVisiblePage()
         saveCurrentProgress()
@@ -793,25 +830,39 @@ final class ReaderViewController: UIViewController {
         collectionView.layoutIfNeeded()
     }
 
-    private func scheduleAutoReadTick() {
-        autoReadTickTask?.cancel()
-        autoReadTickTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(nanoseconds: 250_000_000)
-            } catch {
-                return
-            }
-
-            guard let self,
-                  isAutoReading else {
-                return
-            }
-
-            advanceAutoRead(by: 0.25)
-            if isAutoReading {
-                scheduleAutoReadTick()
-            }
+    private func startAutoReadDisplayLink() {
+        invalidateAutoReadDisplayLink()
+        lastAutoReadFrameTimestamp = nil
+        let displayLink = CADisplayLink(target: self, selector: #selector(handleAutoReadFrame(_:)))
+        if #available(iOS 15.0, *) {
+            displayLink.preferredFrameRateRange = CAFrameRateRange(
+                minimum: 30,
+                maximum: 60,
+                preferred: 60
+            )
+        } else {
+            displayLink.preferredFramesPerSecond = 60
         }
+        displayLink.add(to: .main, forMode: .common)
+        autoReadDisplayLink = displayLink
+    }
+
+    private func invalidateAutoReadDisplayLink() {
+        autoReadDisplayLink?.invalidate()
+        autoReadDisplayLink = nil
+        lastAutoReadFrameTimestamp = nil
+    }
+
+    @objc private func handleAutoReadFrame(_ displayLink: CADisplayLink) {
+        guard isAutoReading else {
+            invalidateAutoReadDisplayLink()
+            return
+        }
+
+        let previousTimestamp = lastAutoReadFrameTimestamp ?? displayLink.timestamp
+        let interval = max(0, min(1.0 / 15.0, displayLink.timestamp - previousTimestamp))
+        lastAutoReadFrameTimestamp = displayLink.timestamp
+        advanceAutoRead(by: interval)
     }
 
     private func advanceAutoRead(by interval: TimeInterval) {
@@ -829,13 +880,13 @@ final class ReaderViewController: UIViewController {
 
         let maxOffsetY = max(0, collectionView.contentSize.height - collectionView.bounds.height)
         let nextOffsetY = min(maxOffsetY, collectionView.contentOffset.y + distance)
-        UIView.animate(withDuration: interval, delay: 0, options: [.beginFromCurrentState, .curveLinear, .allowUserInteraction]) {
-            self.collectionView.contentOffset = CGPoint(x: self.collectionView.contentOffset.x, y: nextOffsetY)
-        } completion: { [weak self] _ in
-            self?.updateCurrentPageFromVisiblePage()
-        }
+        collectionView.setContentOffset(
+            CGPoint(x: collectionView.contentOffset.x, y: nextOffsetY),
+            animated: false
+        )
+        updateCurrentPageFromVisiblePage()
 
-        if nextOffsetY >= max(0, maxOffsetY - collectionView.bounds.height * 0.8) {
+        if nextOffsetY >= max(0, maxOffsetY - collectionView.bounds.height * 1.6) {
             loadNextPageIfNeeded()
         }
 
@@ -853,9 +904,9 @@ final class ReaderViewController: UIViewController {
 
         let targetOffset: CGPoint
         if usesVerticalScrolling {
-            targetOffset = CGPoint(x: 0, y: CGFloat(currentIndex) * collectionView.bounds.height)
+            targetOffset = CGPoint(x: 0, y: CGFloat(currentIndex) * pageExtentForCurrentMode())
         } else {
-            targetOffset = CGPoint(x: CGFloat(currentIndex) * collectionView.bounds.width, y: 0)
+            targetOffset = CGPoint(x: CGFloat(currentIndex) * pageExtentForCurrentMode(), y: 0)
         }
         collectionView.setContentOffset(targetOffset, animated: false)
     }
@@ -1487,14 +1538,19 @@ final class ReaderViewController: UIViewController {
             let page = pages[indexPath.item]
             cell.configure(
                 page: page,
-                settings: pageRenderingSettings,
+                settings: renderingSettingsForVisibleCells(),
                 filterRules: contentFilterRules,
-                statusConfiguration: statusConfiguration(for: page)
+                statusConfiguration: inlineStatusConfiguration(for: page)
             )
         }
+        updateAutoReadStatusBar()
     }
 
     private func refreshVisibleStatusWidgets() {
+        guard !isAutoReading else {
+            updateAutoReadStatusBar()
+            return
+        }
         for indexPath in collectionView.indexPathsForVisibleItems {
             guard pages.indices.contains(indexPath.item),
                   let cell = collectionView.cellForItem(at: indexPath) as? ReaderPageCell else {
@@ -1729,9 +1785,7 @@ final class ReaderViewController: UIViewController {
         }
 
         pages.insert(page, at: 0)
-        let pageLength = usesVerticalScrolling
-            ? collectionView.bounds.height
-            : collectionView.bounds.width
+        let pageLength = pageExtentForCurrentMode()
         trimResidentPagesAfterPrepending()
         applyPagesSnapshot()
         if pageLength > 0 {
@@ -1936,11 +1990,15 @@ final class ReaderViewController: UIViewController {
             return nil
         }
 
-        let pageLength = usesVerticalScrolling
-            ? collectionView.bounds.height
-            : collectionView.bounds.width
+        let pageLength = pageExtentForCurrentMode()
         guard pageLength > 1 else {
             return nil
+        }
+
+        if isAutoReading {
+            let centeredOffset = collectionView.contentOffset.y + collectionView.bounds.height * 0.5
+            let index = Int(floor(centeredOffset / pageLength))
+            return min(max(index, 0), pages.count - 1)
         }
 
         let rawOffset = usesVerticalScrolling
@@ -1948,6 +2006,23 @@ final class ReaderViewController: UIViewController {
             : collectionView.contentOffset.x / pageLength
         let roundedIndex = Int(round(rawOffset))
         return min(max(roundedIndex, 0), pages.count - 1)
+    }
+
+    private func pageExtentForCurrentMode() -> CGFloat {
+        if isAutoReading {
+            return autoReadPageHeight()
+        }
+        return usesVerticalScrolling
+            ? collectionView.bounds.height
+            : collectionView.bounds.width
+    }
+
+    private func autoReadPageHeight() -> CGFloat {
+        guard collectionView.bounds.height > 1 else {
+            return 1
+        }
+        let layout = effectiveReadingLayout(from: activeSettings)
+        return max(1, layout.contentRect(in: collectionView.bounds).height)
     }
 
     private func trimResidentPagesIfNeeded() -> Int {
@@ -2006,9 +2081,7 @@ final class ReaderViewController: UIViewController {
         guard removePrefixCount > 0 else {
             return
         }
-        let pageLength = usesVerticalScrolling
-            ? collectionView.bounds.height
-            : collectionView.bounds.width
+        let pageLength = pageExtentForCurrentMode()
         guard pageLength > 0 else {
             return
         }
@@ -2035,6 +2108,19 @@ final class ReaderViewController: UIViewController {
         self.isLoadingNextPage = isLoadingNextPage
         updateChrome()
         refreshBookmarkState()
+        updateAutoReadStatusBar()
+    }
+
+    private func updateAutoReadStatusBar() {
+        guard isAutoReading,
+              let currentPage,
+              let configuration = statusConfiguration(for: currentPage) else {
+            autoReadStatusBarView.isHidden = true
+            return
+        }
+        autoReadStatusBarView.isHidden = false
+        autoReadStatusBarView.applyTheme(activeSettings.theme)
+        autoReadStatusBarView.configure(configuration)
     }
 
     @objc private func handleReaderTap(_ gesture: UITapGestureRecognizer) {
@@ -2160,10 +2246,10 @@ final class ReaderViewController: UIViewController {
 
     private func contentOffset(forPageAt index: Int) -> CGPoint {
         if usesVerticalScrolling {
-            return CGPoint(x: 0, y: CGFloat(index) * collectionView.bounds.height)
+            return CGPoint(x: 0, y: CGFloat(index) * pageExtentForCurrentMode())
         }
 
-        return CGPoint(x: CGFloat(index) * collectionView.bounds.width, y: 0)
+        return CGPoint(x: CGFloat(index) * pageExtentForCurrentMode(), y: 0)
     }
 
     private func scrollToPage(at index: Int, animated _: Bool) {
@@ -2279,6 +2365,9 @@ extension ReaderViewController: UICollectionViewDelegateFlowLayout {
         layout collectionViewLayout: UICollectionViewLayout,
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
+        if isAutoReading {
+            return CGSize(width: collectionView.bounds.width, height: autoReadPageHeight())
+        }
         collectionView.bounds.size
     }
 }
